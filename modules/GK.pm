@@ -182,6 +182,13 @@ sub arrange {
 		$_->pack(side => "top");
 	}
 }
+
+sub empty {
+	my $self = shift;
+	foreach ($self->get_widgets()) {
+		$_->destroy();
+	}
+}
 print ".";
 
 package StatusBar; #Replaces Gtk2::Statusbar
@@ -203,6 +210,12 @@ sub prepare {
 	);
 	$self->pack( fill => 'x', expand => 0, side => "bottom", );
 	return $self; # allows StatusBar->new()->prepare() call
+}
+
+sub push {
+	my ($self,$text) = @_;
+	$self->text($text);
+	$self->repaint();
 }
 print ".";
 

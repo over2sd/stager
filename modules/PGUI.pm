@@ -28,7 +28,6 @@ sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
 	my $self = shift;
 	my $menus = [
 		[ '~File' => [
-#			['~Import', 'Ctrl-O', '^O', sub { importGUI() } ],
 #			['~Export', sub { message('export!') }],
 #			['~Synchronize', 'Ctrl-S', '^S', sub { message('synch!') }],
 #			['~Preferences', \&callOptBox],
@@ -57,7 +56,7 @@ sub createMainWin {
 	my ($version,$w,$h) = @_;
 	my $window = Prima::MainWindow->new(
 		text => (config('Custom','program') or "$PROGNAME") . " v.$version",
-		size => [($w or 750),($h or 550)],
+		size => [($w or 400),($h or 400)],
 	);
 	if (config('Main','savepos')) {
 		unless ($w and $h) { $w = config('Main','width'); $h = config('Main','height'); }
@@ -112,20 +111,10 @@ sub getStatus {
 }
 print ".";
 
-sub getTabByCode { # for definitively finding page ID of recent, suggested tabs...
+sub getTabByCode { # for definitively finding page ID of tabs...
 	my $code = shift;
 	my $tabs = (getGUI("tablist") or []);
 	return Common::findIn($code,@$tabs);
-}
-print ".";
-
-sub importGUI {
-	use Import qw( importXML );
-	my $gui = getGUI();
-	my $dbh = FlexSQL::getDB();
-	### Later, put selection here for type of import to make
-	# For now, just allowing import of XML file
-	return Import::importXML($dbh,$gui);
 }
 print ".";
 
@@ -138,13 +127,13 @@ sub loadDBwithSplashDetail {
 	my $steps = 4;
 	my $step = 0;
 	my $base = "";
-	$text->text("Loading database config...");
+	$text->push("Loading database config...");
 	$prog->value(++$step/$steps*100);
 	my $curstep = $box->insert( Label => text => "");
 	unless (defined config('DB','type')) {
 		$steps ++; # number of steps in type dialogue
 		my $dbtype = undef;
-		$text->text("Getting settings from user...");
+		$text->push("Getting settings from user...");
 		$prog->value(++$step/$steps*100); # 0 (matches else)
 		my $result = message("Choose database type:",mb::Cancel | mb::Yes | mb::No,
 			buttons => {
@@ -167,7 +156,7 @@ sub loadDBwithSplashDetail {
 			print "Exiting (abort).\n";
 			$$gui{mainWin}->close();
 		}
-		$text->text("Saving database type...");
+		$text->push("Saving database type...");
 		$prog->value(++$step/$steps*100);
 		# push DB type back to config, as well as all other DB information, if applicable.
 		config('DB','type',$dbtype);
@@ -183,7 +172,7 @@ sub loadDBwithSplashDetail {
 		unless ($base eq 'L') {
 			$steps ++; # type dialogue
 			$curstep->text("Enter database login info");
-			$text->text("Getting login credentials...");
+			$text->push("Getting login credentials...");
 			$prog->value(++$step/$steps*100); # 0
 		# ask user for host
 			my $host = input_box("Server Info","Server address:","127.0.0.1");
@@ -195,12 +184,13 @@ sub loadDBwithSplashDetail {
 			my $pmand = (message("Password required?",mb::YesNo) == mb::Yes ? 'y' : 'n');
 			$curstep->text("---");
 			# save data from entry boxes...
-			$text->text("Saving server info...");
+			$text->push("Saving server info...");
 			$prog->value(++$step/$steps*100); # 1
 #			$uname = ($umand ? $uname : undef);
 			config('DB','host',$host); config('DB','user',$uname); config('DB','password',$pmand);
 		} else {
-			$text->text("Using file as database...");
+			$text->push("Using file as database...");
+# TODO: Replace with SaveDialog to choose DB filename?
 			config('DB','host','localfile'); # to prevent going through this branch every time
 			$prog->value(++$step/$steps*100); # 0a
 		}
@@ -210,7 +200,7 @@ sub loadDBwithSplashDetail {
 	# ask for password, if needed.
 	my $passwd = ($pw =~ /[Yy]/ ? input_box("Login Credentials","Enter password for $uname\@$host:") : '');
 	$curstep->text("Establish database connection.");
-	$text->text("Connecting to database...");
+	$text->push("Connecting to database...");
 	$prog->value(++$step/$steps*100);
 	my ($dbh,$error) = FlexSQL::getDB($base,$host,'stager',$passwd,$uname);
 	unless (defined $dbh) { # error handling
@@ -218,9 +208,9 @@ sub loadDBwithSplashDetail {
 		print "Exiting (no DB).\n";
 	} else {
 		$curstep->text("---");
-		$text->text("Connected.");
+		$text->push("Connected.");
 	}
-	$text->text("Done loading database.");
+	$text->push("Done loading database.");
 	$prog->value(++$step/$steps*100);
 	if (0) { print "Splash screen steps: $step/$steps\n"; }
 	$box->close();
@@ -231,10 +221,33 @@ print ".";
 sub populateMainWin {
 	my ($dbh,$gui,$refresh) = @_;
 print ".";
-	$$gui{status}->text(($refresh ? "Reb" : "B") . "uilding UI...");
+	$$gui{status}->push(($refresh ? "Reb" : "B") . "uilding UI...");
 # make a scrolled window
-	$$gui{listpane} = $$gui{mainWin}->insert( ScrollWidget => name => "Scroller" );
+	my @tabtexts;
+	my @tabs = qw[ mem rol ];
+	foreach (@tabs) { # because tabs are controlled by option, tabnames must also be.
+		if (/mem/) { push(@tabtexts,(config('Custom',$_) or "Members")); }
+		elsif (/rol/) { push(@tabtexts,(config('Custom',$_) or "Roles")); }
+	}
+	$$gui{tablist} = \@tabs;
+	my %args;
+	if (defined config('UI','tabson')) { $args{orientation} = (config('UI','tabson') eq "bottom" ? tno::Bottom : tno::Top); } # set tab position based on config option
+	$$gui{tabbar} = Prima::TabbedScrollNotebook->create(
+		owner => getGUI("mainWin"),
+		style => tns::Simple,
+		tabs => \@tabtexts,
+		name => 'Scroller',
+		tabsetProfile => {colored => 0, %args, },
+		pack => { fill => 'both', expand => 1, pady => 3, side => "left", },
+	);
+	$$gui{listpane} = $$gui{tabbar}->insert_to_page(0, VBox => name => "membox", pack => { fill => 'both' } );
+	my $buttonbar = $$gui{listpane}->insert( HBox => name => 'buttons', pack => { side => "top", fill => 'x', expand => 0, }, );
 	my $target = $$gui{listpane}->insert( VBox => name => "Members", pack => { fill => 'both', expand => 1, }, );
+	$buttonbar->insert( Button =>
+		text => "Add Member",
+		onClick => sub { addMember($gui,$dbh,$target); },
+		pack => { side => "right", fill => 'x', expand => 0, },
+	);
 # Pull records from DB
 	my $res = FlexSQL::getMembers($dbh,'all',());
 # foreach record:
@@ -246,13 +259,18 @@ print ".";
 			my $text = "$a[1], $a[0]"; # concatenate famname, givname and put a label in the window.
 			my $button = $target->insert( Button =>
 				text => $text,
-				onClick => sub { showRoleEditor($$gui{mainWin},$dbh,$a[2]); }# link button to role editor
+				alignment => ta::Left,
+				pack => { fill => 'x' },
+				onClick => sub { showRoleEditor($gui,$dbh,$a[2]); }# link button to role editor
 				);
 			# TODO: use $a[2] (member ID) to count roles from roles table
 		}
 	}
+	$$gui{rolepage} = $$gui{tabbar}->insert_to_page(1, VBox => name => "role details", pack => { fill => 'both', expand => 1, side => 'left', });
+	my $memtext = (config("Custom",'mem') or "Members");
+	$$gui{rolepage}->insert( Label => text => "This page is filled when a member name\nis clicked on the $memtext page.", height => 60, pack => { fill => 'both', } );
 print "Nothing";
-	$$gui{status}->text("Ready.");
+	$$gui{status}->push("Ready.");
 print " Done.";
 }
 print ".";
@@ -264,9 +282,127 @@ sub sayBox {
 print ".";
 
 sub showRoleEditor {
-#	$$gui{mainWin},$dbh,$_[2]
-	my ($parent,$dbh,$mid) = @_;
-	sayBox($parent,"This function hasn't been coded yet. (ID: $mid)");
+	my ($gui,$dbh,$mid) = @_;
+	$$gui{rolepage}->empty();
+	my $loading = $$gui{rolepage}->insert( Label => text => "The info for ID #$mid is now loading..." );
+	$$gui{tabbar}->pageIndex(1);
+	#get info for given mid
+	my $res = FlexSQL::getMemberByID($dbh,$mid);
+	my %row = %$res;
+	if (keys %row) {
+	# list info
+		my $meminfo = $$gui{rolepage}->insert( VBox => name => "Roles" );
+		$meminfo->insert( Label => text => "Name: $row{givname} $row{famname}" ); # TODO: support reversed names? Much later, if at all
+		# TODO: member edit button
+		if (config("UI","showcontact")) {
+			$meminfo->insert( Label => text => "E-mail: $row{email}" );
+			$meminfo->insert( Label => text => "Phone: $row{hphone} H $row{mphone} M" );
+		}
+		$meminfo->insert( Label => text => "Roles:", alignment => ta::Left, pack => { fill => 'x', });
+	# get roles
+	# list roles, with edit button for each role
+	# place add role button
+	}
+	$$gui{rolepage}->insert( Button => text => "Return", onClick =>  sub { $$gui{tabbar}->pageIndex(0); } );
+
+	$loading->destroy();
+}
+print ".";
+
+sub addMember {
+	my ($gui,$dbh,$target) = @_;
+	my $addbox = Prima::Dialog->create(
+		borderStyle => bs::Sizeable,
+		size => [400,400],
+		text => "User Details",
+		owner => $$gui{mainWin},
+		onTop => 1,
+	);
+	$addbox->hide();
+	$::application->yield();
+	my $vbox = $addbox->insert( VBox => name => 'details', pack => { fill => 'both', expand => 1 } );
+	$vbox->insert( Button =>
+		text => "Cancel",
+		onClick => sub { print "Cancelled"; $addbox->destroy(); },
+	);
+	my $namebox = $vbox->insert( HBox => name => 'namebox' );
+	my $nbox1 = $namebox->insert( VBox => name => 'n1' );
+	my $nbox2 = $namebox->insert( VBox => name => 'n2' );
+	$nbox1->insert( Label => text => "Given Name" );
+	my $givname = $nbox1->insert( InputLine => maxLen => 23, text => '', );
+	$nbox2->insert( Label => text => "Family Name" );
+	my $famname = $nbox2->insert( InputLine => maxLen => 28, text => '', );
+	$vbox->insert( Label => text => "Home Phone" );
+	my $hphone = $vbox->insert( InputLine => maxLen => 10, width => 150, text => '##########', );
+	$vbox->insert( Label => text => "Mobile/Work Phone" );
+	my $mphone = $vbox->insert( InputLine => maxLen => 10, width => 150, text => '##########', );
+	$vbox->insert( Label => text => "E-mail Address" );
+	my $email = $vbox->insert( InputLine => maxLen => 254, text => (config('InDef','email') or 'user@example.com'), pack => { fill => 'x', } );
+	my $abox = $vbox->insert( HBox => name => 'abox' );
+# TODO: Add calendar button for date of birth? (if option selected?)
+	$abox->insert( Label => text => "Age (or A for adult 21+ )" );
+	my $age = $abox->insert( InputLine => maxLen => 3, width => 45, text => '', );
+	$vbox->insert( Label => text => "Street Address" );
+	my $address = $vbox->insert( InputLine => maxLen => 253, text => '', pack => { fill => 'x', } );
+	my $cbox = $vbox->insert( HBox => name => 'citybox' );
+	my $cbox1 = $cbox->insert( VBox => name => 'c1', pack => { fill => 'x', expand => 1 } );
+	my $cbox2 = $cbox->insert( VBox => name => 'c2' );
+	my $cbox3 = $cbox->insert( VBox => name => 'c3' );
+	$cbox1->insert( Label => text => "City" );
+	$cbox2->insert( Label => text => "State" );
+	$cbox3->insert( Label => text => "ZIP" );
+	my $city = $cbox1->insert( InputLine => maxLen => 99, text => (config('InDef','city') or ''), pack => { fill => 'x', } );
+	my $state = $cbox2->insert( InputLine => maxLen => 3, text => (config('InDef','state') or ''), width => 45, );
+	my $zip = $cbox3->insert( InputLine => maxLen => 10, text => (config('InDef','ZIP') or ''), );
+# TODO: Add radio button for member types?
+	my %user;
+	$vbox->insert( Button =>
+		text => "Add User",
+		onClick => sub {
+			$addbox->hide();
+			# process information
+			unless ($famname->text ne '' && $givname->text ne '') {
+				sayBox($addbox,"Required fields: Family Name, Given Name");
+				$addbox->show();
+				return;
+			}
+			$user{famname} = $famname->text;
+			$user{givname} = $givname->text;
+			$user{hphone} = $hphone->text if ($hphone->text ne '##########');
+			$user{mphone} = $mphone->text if ($mphone->text ne '##########');
+			$user{email} = $email->text if ($email->text ne (config('InDef','email') or 'user@example.com'));
+			$user{age} = $age->text if ($age->text ne '');
+			$user{address} = $address->text if ($address->text ne '');
+			$user{city} = $city->text if ($city->text ne '' && $address->text ne '');
+			$user{state} = $state->text if ($state->text ne '' && $address->text ne '');
+			$user{zip} = $zip->text if ($zip->text ne '' && $address->text ne '');
+			$addbox->destroy();
+			# store information
+			my ($error,$cmd,@parms) = FlexSQL::prepareFromHash(\%user,'member',0);
+			if ($error) { sayBox($$gui{mainWin},"Preparing user add statement failed: $error - $parms[0]"); return; }
+			$error = FlexSQL::doQuery(2,$dbh,$cmd,@parms);
+			unless ($error == 1) { sayBox($$gui{mainWin},"Adding user to database failed: $error"); return; }
+			$cmd = "SELECT givname, famname, mid FROM member WHERE famname=? AND givname=?;";
+			@parms = ($user{famname},$user{givname});
+			my $res = FlexSQL::doQuery(4,$dbh,$cmd,@parms);
+			unless (defined $res) {
+				Pdie("Error: Database access yielded undef!");
+			} else {
+				foreach (@$res) {
+					my @a = @$_;
+					my $text = "$a[1], $a[0]"; # concatenate famname, givname and put a label in the window.
+					my $button = $target->insert( Button =>
+						text => $text,
+						alignment => ta::Left,
+						pack => { fill => 'x' },
+						onClick => sub { showRoleEditor($gui,$dbh,$a[2]); }# link button to role editor
+					);
+				}
+			}
+		}
+	);
+	$addbox->show();
+#	my $result = $addbox->execute();
 }
 print ".";
 

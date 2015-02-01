@@ -78,7 +78,7 @@ print ".";
 sub getFileName {
 	my ($caller,$parent,$guir,$title,$action,$oktext,%filter) = @_;
 	unless (defined $parent) { $parent = $$guir{mainWin}; }
-	$$guir{status}->text("Choosing file...");
+	$$guir{status}->push("Choosing file...");
 	my $filebox = Prima::OpenDialog->new(
 		filter => %filter,
 		fileMustExist => 1
@@ -87,7 +87,7 @@ sub getFileName {
 	if ($filebox->execute()) {
 		$filename = $filebox->fileName;
 	} else {
-		$$guir{status}->text("Import cancelled.");
+		$$guir{status}->push("File selection cancelled.");
 	}
 	$filebox->destroy();
 	return $filename;

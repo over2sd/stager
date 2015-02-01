@@ -32,7 +32,7 @@ server=127.0.0.1
 delold=0
 
 ### Change this to 1 when you've edited these variables
-edited=1
+edited=0
 
 ### Do not edit anything below this line. ###
 ### If the above values are correct, change 'edited' to 1. ###

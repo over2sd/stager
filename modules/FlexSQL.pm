@@ -67,7 +67,7 @@ print ".";
 sub doQuery {
 	my ($qtype,$dbh,$statement,@parms) = @_;
 	my $realq;
-	print "Received '$statement' ",join(',',@parms),"\n";
+#	print "Received '$statement' ",join(',',@parms),"\n";
 	my $safeq = $dbh->prepare($statement);
 	if ($qtype == -1) { unless (defined $safeq) { return 0; } else { return 1; }} # prepare only
 	unless (defined $safeq) { warn "Statement could not be prepared! Aborting statement!\n"; return undef; }
@@ -97,12 +97,15 @@ sub doQuery {
 		my $key = pop(@parms);
 		$safeq->execute(@parms);
 		$realq = $safeq->fetchall_hashref($key);
-	} elsif ($qtype == 4){
+	} elsif ($qtype == 4){ # returns arrayref containing arrayref for each row
 		$safeq->execute(@parms);
 		$realq = $safeq->fetchall_arrayref();
 	} elsif ($qtype == 5){
 		$safeq->execute(@parms);
 		$realq = $safeq->fetchrow_arrayref();
+	} elsif ($qtype == 6){ # returns a single row in a hashref; use with a primary key!
+		$safeq->execute(@parms);
+		$realq = $safeq->fetchrow_hashref();
 	} else {
 		warn "Invalid query type";
 	}
@@ -143,8 +146,8 @@ sub prepareFromHash {
 		my $valstxt = "VALUES (";
 		$cmd = "INSERT INTO $cmd (";
 		my @cols;
-		push(@parms,$vals{$idcol});
-		push(@cols,$idcol);
+#		push(@parms,$vals{$idcol});
+#		push(@cols,$idcol);
 		print "$incolor";
 		foreach (keys %vals) {
 			unless (Common::findIn($_,@keys) < 0) {
@@ -182,9 +185,17 @@ sub getMembers {
 	my ($dbh,$mtype,%exargs) = @_;
 	my $st = "SELECT givname, famname, mid FROM member ORDER BY famname;";
 	my $res = doQuery(4,$dbh,$st);
-use Data::Dumper;
-	print Dumper $res;
 	return $res;
+}
+print ".";
+
+sub getMemberByID {
+	my ($dbh,$mid,%exargs) = @_;
+	my $st = "SELECT * FROM member WHERE mid=?;";
+	my $res = doQuery(6,$dbh,$st,$mid);
+	return $res unless $DBI::err;
+	warn $DBI::errstr;
+	return {};
 }
 print ".";
 
