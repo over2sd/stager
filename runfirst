@@ -40,6 +40,8 @@ edited=0
 case $edited in
 	0)
 		echo -e "\n*** Warning: You need to verify the variables before setting up Stager. ***\n"
+		echo "This script does not need to be run if you are not using a SQL server."
+		echo "  For serverless mode, the main program will make the SQLite database."
 		echo "This script currently has these settings:"
 		echo "  The database owner (you?) will be this user: $user"
 		echo "  You'll connect to your database from this host: ${host}"
@@ -71,5 +73,5 @@ esac
 
 # echo "The following prompt refers to the MySQL root password, not the system root password:"
 mysql -h $server -u root --password=${sqlpass} < rootset.msq
-mysql -h $server $options < stager.msq
+#mysql -h $server $options < stager.msq
 echo "Done."

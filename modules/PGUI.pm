@@ -56,7 +56,7 @@ sub createMainWin {
 	my ($version,$w,$h) = @_;
 	my $window = Prima::MainWindow->new(
 		text => (config('Custom','program') or "$PROGNAME") . " v.$version",
-		size => [($w or 400),($h or 400)],
+		size => [($w or 640),($h or 480)],
 	);
 	if (config('Main','savepos')) {
 		unless ($w and $h) { $w = config('Main','width'); $h = config('Main','height'); }
@@ -210,6 +210,26 @@ sub loadDBwithSplashDetail {
 		$curstep->text("---");
 		$text->push("Connected.");
 	}
+	if ($error =~ m/Unknown database/) { # rudimentary detection of first run
+		$steps++;
+		$curstep->text("Database not found. Attempting to initialize...");
+		$text->text("Attempting to initialize database...");
+		$prog->value(++$step/$steps*100);
+		($dbh,$error) = FlexSQL::makeDB($base,$host,'stager',$passwd,$uname);
+	}
+	unless (defined $dbh) { # error handling
+		Pdie("ERROR: $error");
+		print "Exiting (no DB).\n";
+	} else {
+		$curstep->text("---");
+		$text->text("Connected.");
+	}
+	unless (FlexSQL::table_exists($dbh,'work')) {
+		$steps++;
+		$prog->value(++$step/$steps*100);
+		$text->text("Attempting to initialize database tables...");
+		FlexSQL::makeTables($dbh);
+	}
 	$text->push("Done loading database.");
 	$prog->value(++$step/$steps*100);
 	if (0) { print "Splash screen steps: $step/$steps\n"; }
@@ -244,7 +264,7 @@ print ".";
 	my $buttonbar = $$gui{listpane}->insert( HBox => name => 'buttons', pack => { side => "top", fill => 'x', expand => 0, }, );
 	my $target = $$gui{listpane}->insert( VBox => name => "Members", pack => { fill => 'both', expand => 1, }, );
 	$buttonbar->insert( Button =>
-		text => "Add Member",
+		text => "Add a member",
 		onClick => sub { addMember($gui,$dbh,$target); },
 		pack => { side => "right", fill => 'x', expand => 0, },
 	);
@@ -268,8 +288,7 @@ print ".";
 	}
 	$$gui{rolepage} = $$gui{tabbar}->insert_to_page(1, VBox => name => "role details", pack => { fill => 'both', expand => 1, side => 'left', });
 	my $memtext = (config("Custom",'mem') or "Members");
-	$$gui{rolepage}->insert( Label => text => "This page is filled when a member name\nis clicked on the $memtext page.", height => 60, pack => { fill => 'both', } );
-print "Nothing";
+	$$gui{rolepage}->insert( Label => text => "Click on a member name on the $memtext page to fill this tab.", height => 60, pack => { fill => 'both', } );
 	$$gui{status}->push("Ready.");
 print " Done.";
 }
@@ -291,17 +310,20 @@ sub showRoleEditor {
 	my %row = %$res;
 	if (keys %row) {
 	# list info
-		my $meminfo = $$gui{rolepage}->insert( VBox => name => "Roles" );
-		$meminfo->insert( Label => text => "Name: $row{givname} $row{famname}" ); # TODO: support reversed names? Much later, if at all
+		my $nametxt = "Name: $row{givname} $row{famname}";
+		my $meminfo = labelBox($$gui{rolepage},$nametxt,"Roles",'v');
 		# TODO: member edit button
 		if (config("UI","showcontact")) {
 			$meminfo->insert( Label => text => "E-mail: $row{email}" );
 			$meminfo->insert( Label => text => "Phone: $row{hphone} H $row{mphone} M" );
 		}
 		$meminfo->insert( Label => text => "Roles:", alignment => ta::Left, pack => { fill => 'x', });
+		my $roletarget = $meminfo->insert( VBox => name => "rolebox", backColor => (convertColor(config('UI','rolebg') or "#99f")), pack => { fill => 'both', expand => 1, side => "left", padx => 5, pady => 5, }, );
 	# get roles
 	# list roles, with edit button for each role
 	# place add role button
+		my $addbutton = $meminfo->insert( Button => text => "Add a role", );
+		$addbutton->onClick( sub { addRole($dbh, $mid, $roletarget, $addbutton); } );
 	}
 	$$gui{rolepage}->insert( Button => text => "Return", onClick =>  sub { $$gui{tabbar}->pageIndex(0); } );
 
@@ -325,12 +347,10 @@ sub addMember {
 		text => "Cancel",
 		onClick => sub { print "Cancelled"; $addbox->destroy(); },
 	);
-	my $namebox = $vbox->insert( HBox => name => 'namebox' );
-	my $nbox1 = $namebox->insert( VBox => name => 'n1' );
-	my $nbox2 = $namebox->insert( VBox => name => 'n2' );
-	$nbox1->insert( Label => text => "Given Name" );
+	my $namebox = $vbox->insert( HBox => name => 'namebox', pack => { expand => 1, }, );
+	my $nbox1 = labelBox($namebox,"Given Name",'n1','v');
+	my $nbox2 = labelBox($namebox,"Family Name",'n2','v');
 	my $givname = $nbox1->insert( InputLine => maxLen => 23, text => '', );
-	$nbox2->insert( Label => text => "Family Name" );
 	my $famname = $nbox2->insert( InputLine => maxLen => 28, text => '', );
 	$vbox->insert( Label => text => "Home Phone" );
 	my $hphone = $vbox->insert( InputLine => maxLen => 10, width => 150, text => '##########', );
@@ -338,20 +358,16 @@ sub addMember {
 	my $mphone = $vbox->insert( InputLine => maxLen => 10, width => 150, text => '##########', );
 	$vbox->insert( Label => text => "E-mail Address" );
 	my $email = $vbox->insert( InputLine => maxLen => 254, text => (config('InDef','email') or 'user@example.com'), pack => { fill => 'x', } );
-	my $abox = $vbox->insert( HBox => name => 'abox' );
+	my $abox = labelBox($vbox,"Age (or A for adult 21+ )",'abox','h',boxfill => 'x');
 # TODO: Add calendar button for date of birth? (if option selected?)
-	$abox->insert( Label => text => "Age (or A for adult 21+ )" );
 	my $age = $abox->insert( InputLine => maxLen => 3, width => 45, text => '', );
 	$vbox->insert( Label => text => "Street Address" );
 	my $address = $vbox->insert( InputLine => maxLen => 253, text => '', pack => { fill => 'x', } );
-	my $cbox = $vbox->insert( HBox => name => 'citybox' );
-	my $cbox1 = $cbox->insert( VBox => name => 'c1', pack => { fill => 'x', expand => 1 } );
-	my $cbox2 = $cbox->insert( VBox => name => 'c2' );
-	my $cbox3 = $cbox->insert( VBox => name => 'c3' );
-	$cbox1->insert( Label => text => "City" );
-	$cbox2->insert( Label => text => "State" );
-	$cbox3->insert( Label => text => "ZIP" );
-	my $city = $cbox1->insert( InputLine => maxLen => 99, text => (config('InDef','city') or ''), pack => { fill => 'x', } );
+	my $cbox = $vbox->insert( HBox => name => 'citybox', pack => { expand => 1, }, );
+	my $cbox1 = labelBox($cbox,"City",'c1','v',boxfill => 'x', labfill => 'x');
+	my $cbox2 = labelBox($cbox,"State",'c2','v');
+	my $cbox3 = labelBox($cbox,"ZIP",'c3','v');
+	my $city = $cbox1->insert( InputLine => maxLen => 99, text => (config('InDef','city') or ''), pack => { fill => 'x', expand => 1} );
 	my $state = $cbox2->insert( InputLine => maxLen => 3, text => (config('InDef','state') or ''), width => 45, );
 	my $zip = $cbox3->insert( InputLine => maxLen => 10, text => (config('InDef','ZIP') or ''), );
 # TODO: Add radio button for member types?
@@ -403,6 +419,50 @@ sub addMember {
 	);
 	$addbox->show();
 #	my $result = $addbox->execute();
+}
+print ".";
+
+sub labelBox {
+	my ($parent,$label,$name,$orientation,%args) = @_;
+	my $box;
+	unless (defined $orientation && $orientation =~ /[Hh]/) {
+		$box = $parent->insert( VBox => name => "$name", pack => { fill => ($args{boxfill} or 'none'), expand => ($args{boxex} or 1) }, );
+	} else {
+		$box = $parent->insert( HBox => name => "$name", pack => { fill => ($args{boxfill} or 'none'), expand => ($args{boxex} or 1) }, );
+	}
+	$box->insert( Label => text => "$label", pack => { fill => ($args{labfill} or 'x'), expand => ($args{labex} or 0), }  );
+	return $box;
+}
+print ".";
+
+sub addRole {
+	my ($dbh, $mid, $target,$button) = @_;
+	$button->hide();
+	my $editbox = $target->insert( HBox => name => 'roleadd', pack => { fill => 'x', expand => 0, }, );
+	my $showbox = labelBox($editbox,"Production",'shobox','v',boxfill => 'x', boxex => 0, labex => 1);
+	my @showlist = values FlexSQL::getShowList();
+	my $work = $showbox->insert( ComboBox => style => cs::DropDown, items => \@showlist, text => '');
+	my $rolebox = labelBox($editbox,"Role",'rolbox','v',boxfill => 'x', labex => 1);
+	my $role = $rolebox->insert( InputLine => text => '' );
+	my $ybox = labelBox($editbox,"Year",'ybox','v',labex => 1);
+	my $year = $ybox->insert( InputLine => text => '' );
+	my $mbox = labelBox($editbox,"Month",'mbox','v',labex => 1);
+	my $month = $mbox->insert( InputLine => text => '' );
+	my $tbox = labelBox($editbox,"Troupe",'tbox','v', bocfill => 'x', labex => 1);
+	my @troupes = values FlexSQL::getTroupeList();
+	my $troupe = $tbox->insert( ComboBox => style => cs::DropDown, items => \@troupes, text => '');
+	my $submitter = $target->insert( Button => text => "Submit button placeholder");
+	$submitter->onClick( sub { print "Not yet coded."; $button->show(); $editbox->destroy(); $submitter->destroy(); } );
+print "Loading of roles for member #$mid is not yet coded.\n";
+}
+print ".";
+
+sub showRole {
+	my ($target,$sid,$tid,$role,$y,$m) = @_;
+	$tname = FlexSQL::getTroupeByID($tid);
+	$sname = FlexSQL::getShowByID($sid);
+	$target->insert( Label => text => "$sname: $role ($tname, $m/$y)" );
+	return 0;
 }
 print ".";
 

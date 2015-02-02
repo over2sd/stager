@@ -63,6 +63,73 @@ sub whoAmI {
 }
 print ".";
 
+# functions for creating database
+sub makeDB {
+	my ($dbtype) = shift; # same prep work as regular connection...
+	my $host = shift || 'localhost';
+	my $base = shift || 'stager';
+	my $password = shift || '';
+	my $username = shift || whoAmI();
+	use DBI;
+	my $dbh;
+	print "Creating database...";
+	if ($dbtype eq "L") { # for people without access to a SQL server
+		$dbh = DBI->connect( "dbi:SQLite:stager.dbl" ) || return undef,"Cannot connect: $DBI::errstr";
+		my $newbase = $dbh->quote_identifier($base); # just in case...
+		unless ($dbh->func("createdb", $newbase, 'admin')) { return undef,$DBI::errstr; }
+	} elsif ($dbtype eq "M") {
+		# connect to the database
+		my $flags = { mysql_enable_utf8mb4 => 1 };
+		if ($password ne '') {
+			$dbh = DBI->connect("DBI:mysql::$host",$username, $password,$flags) ||
+				return undef, qq{DBI error from connect: "$DBI::errstr"};
+		} else {
+			$dbh = DBI->connect("DBI:mysql::$host",$username,undef,$flags) ||
+				return undef, qq{DBI error from connect: "$DBI::errstr"};
+		}
+		my $newbase = $dbh->quote_identifier($base); # just in case...
+		unless(doQuery(2,$dbh,"CREATE DATABASE $newbase")) { return undef,$DBI::errstr; }
+	}	
+	print "Database created.";
+	$dbh->disconnect();
+	if ($dbtype eq "L") { # for people without access to a SQL server
+		$dbh = DBI->connect( "dbi:SQLite:stager.dbl" ) || return undef,"Cannot connect: $DBI::errstr";
+	} elsif ($dbtype eq "M") {
+		# connect to the database
+		my $flags = { mysql_enable_utf8mb4 => 1 };
+		if ($password ne '') {
+			$dbh = DBI->connect("DBI:mysql:$base:$host",$username,$password,$flags) ||
+				return undef, qq{DBI error from connect: "$DBI::errstr"};
+		} else {
+			$dbh = DBI->connect("DBI:mysql:$base:$host",$username,undef,$flags) ||
+				return undef, qq{DBI error from connect: "$DBI::errstr"};
+		}
+	}
+	return $dbh,"OK";
+}
+print ".";
+
+sub makeTables { # used for first run
+	my ($dbh) = shift; # same prep work as regular connection...
+	print "Creating tables...";
+	open(TABDEF, "<stager.msq"); # open table definition file
+	my @cmds = <TABDEF>;
+	print "Importing " . scalar @cmds . " lines.";
+	foreach my $i (0 .. $#cmds) {
+		my $st = $cmds[$i];
+		if ('SQLite' eq $dbh->{Driver}->{Name}) {
+			$st =~ s/ UNSIGNED//g; # SQLite doesn't (properly) support unsigned?
+			$st =~ s/ AUTO_INCREMENT//g; #...or auto_increment?
+		}
+		my $error = doQuery(2,$dbh,$st);
+#		print $i + 1 . ($error ? ": $st\n" : "" );
+		print ".";
+		if($error) { return undef,$error; }
+	}
+	return $dbh,"OK";
+}
+print ".";
+
 # functions for accessing database
 sub doQuery {
 	my ($qtype,$dbh,$statement,@parms) = @_;
@@ -196,6 +263,34 @@ sub getMemberByID {
 	return $res unless $DBI::err;
 	warn $DBI::errstr;
 	return {};
+}
+print ".";
+
+my %shows = ('1' => "Foo", '2' => "Bar", '3' => "Baz"); # until I code the SQL puller for this
+sub getShowByID {
+	my ($dbh,$sid) = @_;
+# TODO: pull data from DB if key not filled
+	return $shows{"$sid"};
+}
+print ".";
+
+sub getShowList {
+# TODO: pull data from DB if keys not filled
+	return \%shows;
+}
+print ".";
+
+my %troupes = ('1' => "Company A", '2' => "Local High School B"); # until I code the SQL puller for this
+sub getTroupeByID {
+	my ($dbh,$tid) = @_;
+# TODO: pull data from DB if key not filled
+	return $troupes{"$tid"};
+}
+print ".";
+
+sub getTroupeList {
+# TODO: pull data from DB if keys not filled
+	return \%troupes;
 }
 print ".";
 
