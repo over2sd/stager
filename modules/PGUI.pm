@@ -35,7 +35,7 @@ sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
 			['Close', 'Ctrl-W', km::Ctrl | ord('W'), sub { $self->close() } ],
 		]],
 		[ '~Help' => [
-			['~About',sub { message('About!') }], #\&aboutBox],
+			['~About', \&aboutBox],
 		]],
 	];
 	return $menus;
@@ -305,11 +305,10 @@ sub showRoleEditor {
 	$$gui{rolepage}->empty();
 	my $loading = $$gui{rolepage}->insert( Label => text => "The info for ID #$mid is now loading..." );
 	$$gui{tabbar}->pageIndex(1);
-	#get info for given mid
-	my $res = FlexSQL::getMemberByID($dbh,$mid);
+	my $res = FlexSQL::getMemberByID($dbh,$mid); #get info for given mid
 	my %row = %$res;
 	if (keys %row) {
-	# list info
+		# list info
 		my $nametxt = "Name: $row{givname} $row{famname}";
 		my $meminfo = labelBox($$gui{rolepage},$nametxt,"Roles",'v');
 		# TODO: member edit button
@@ -319,9 +318,14 @@ sub showRoleEditor {
 		}
 		$meminfo->insert( Label => text => "Roles:", alignment => ta::Left, pack => { fill => 'x', });
 		my $roletarget = $meminfo->insert( VBox => name => "rolebox", backColor => (convertColor(config('UI','rolebg') or "#99f")), pack => { fill => 'both', expand => 1, side => "left", padx => 5, pady => 5, }, );
-	# get roles
-	# list roles, with edit button for each role
-	# place add role button
+		my $st = "SELECT * FROM cv WHERE mid=?"; # get roles
+		my $res = FlexSQL::doQuery(3,$dbh,$st,$mid,'rid');
+		foreach (keys %$res) { # list roles, with edit button for each role
+			my %row = %{ $$res{$_} };
+			print "$row{rid}: $row{role}";
+			showRole($dbh,$roletarget,$row{rid},$row{work},$row{troupe},$row{role},$row{year},$row{month});
+		}
+		# place add role button
 		my $addbutton = $meminfo->insert( Button => text => "Add a role", );
 		$addbutton->onClick( sub { addRole($dbh, $mid, $roletarget, $addbutton); } );
 	}
@@ -418,7 +422,6 @@ sub addMember {
 		}
 	);
 	$addbox->show();
-#	my $result = $addbox->execute();
 }
 print ".";
 
@@ -449,10 +452,10 @@ sub addRole {
 	my $year = $ybox->insert( InputLine => text => '', width => 60, maxLen => 4 );
 	my $mbox = labelBox($editbox,"Month",'mbox','v',labex => 1);
 	my $month = $mbox->insert( InputLine => text => '', width => 30, maxLen => 2 );
-	my $tbox = labelBox($editbox,"Troupe",'tbox','v', bocfill => 'x', labex => 1);
+	my $tbox = labelBox($editbox,"Troupe",'tbox','v', boxfill => 'x', labex => 1);
 	my $troupes = FlexSQL::getTroupeList($dbh);
 	my @troupelist = values $troupes;
-	my $troupe = $tbox->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => '', height => 30 );
+	my $troupe = $tbox->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => (config('InDef','troupe') or ''), height => 30 );
 	my $submitter = $editbox->insert( Button => text => "Submit");
 	$submitter->onClick( sub {
 		my $sid = Common::revGet($work->text,undef,%$shows);
@@ -461,45 +464,59 @@ sub addRole {
 			print "New show: " . $work->text . " will be added to database.\n";
 			my $st = "INSERT INTO work (sname) VALUES(?);";
 			my $res = FlexSQL::doQuery(2,$dbh,$st,$work->text);
-			print "(not yet coded) ($res)";
 			$st = "SELECT wid FROM work WHERE sname=?;";
 			$res = FlexSQL::doQuery(0,$dbh,$st,$work->text);
-			print "SID: $res\n";
-			return;
+			$sid = $res unless ($DBI::err);
 		}
 		unless (defined $tid) {
 			print "New troupe: " . $troupe->text . " will be added to database.\n";
 			my $st = "INSERT INTO troupe (tname) VALUES(?);";
 			my $res = FlexSQL::doQuery(2,$dbh,$st,$troupe->text);
-			print "(not yet coded) ($res)";
 			$st = "SELECT tid FROM troupe WHERE tname=?;";
 			$res = FlexSQL::doQuery(0,$dbh,$st,$troupe->text);
-			print "TID: $res\n";
-			return;
+			$tid = $res unless ($DBI::err);
 		}
 		print "-> " . ($sid or "undef") . ": " . $role->text . " (" . ($tid or "undef") . ", " . $month->text . "/" . $year->text . ")";
+		if (defined $sid and defined $tid) {
+			storeNewRole($dbh,$mid,$sid,$tid,$year->text,$month->text,$role->text,$target);
+		} else {
+			sayBox($editbox,"Something went wrong storing the role.");
+		}
 		$button->show();
 		$editbox->destroy();
 		$submitter->destroy();
 	} );
-print "Loading of roles for member #$mid is not yet coded.\n";
 }
 print ".";
 
 sub showRole {
-	my ($target,$rid,$sid,$tid,$role,$y,$m) = @_;
-	my $tname = FlexSQL::getTroupeByID($tid);
-	my $sname = FlexSQL::getShowByID($sid);
-	my $row = labelBox($target,"$sname: $role ($tname, $m/$y)",'h');
-	my $editbut = $row->insert( Button => text => "Edit role ($rid)" );
-# replace this with a row builder that puts the role and an edit button in a row in the target.
+	my ($dbh,$target,$rid,$sid,$tid,$role,$y,$m) = @_;
+	my $tname = FlexSQL::getTroupeByID($dbh,$tid);
+	my $sname = FlexSQL::getShowByID($dbh,$sid);
+	my $row = labelBox($target,"$sname: $role ($tname, $m/$y)",'rolerow','h', boxfill => 'x', labfill => 'none');
+	my $editbut = $row->insert( Button => text => "Edit role", onClick => sub { sayBox($target,"Editing of roles is on the developer's TODO list.\nIf you'd like to help, check out the project's GitHub repo."); } );
 	return 0;
 }
 print ".";
 
 sub storeNewRole {
-	my ($dbh,$sid,$tid,$y,$m,$role,$target) = @_;
+	my ($dbh,$mid,$sid,$tid,$y,$m,$role,$target) = @_;
+	my @parms = ($mid,$sid,$tid,$y,$m,$role);
+	my $st = "INSERT INTO cv (mid,work,troupe,year,month,role) VALUES(?,?,?,?,?,?);";
+	my $res = FlexSQL::doQuery(2,$dbh,$st,@parms);
+	$st = "SELECT rid FROM cv WHERE mid=? AND work=? AND troupe=? AND year=? AND month=? AND role=?;";
+	$res = FlexSQL::doQuery(0,$dbh,$st,@parms);
+	unless ($DBI::err) {
+		showRole($dbh,$target,$res,$sid,$tid,$role,$y,$m);
+	} else {
+		sayBox($target,"An error occurred: $DBI::errstr");
+	}
+}
+print ".";
 
+sub aboutBox {
+	my $w = getGUI('mainWin');
+	sayBox($w,"Stager is a membership tracking program intended for community theatre troupes. If there's anything you'd like to see added to the program, let the developer know.");
 }
 print ".";
 
