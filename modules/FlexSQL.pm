@@ -135,6 +135,9 @@ sub doQuery {
 	my ($qtype,$dbh,$statement,@parms) = @_;
 	my $realq;
 #	print "Received '$statement' ",join(',',@parms),"\n";
+	unless (defined $dbh) {
+		Pdie("Baka! Send me a database, if you want data.");
+	}
 	my $safeq = $dbh->prepare($statement);
 	if ($qtype == -1) { unless (defined $safeq) { return 0; } else { return 1; }} # prepare only
 	unless (defined $safeq) { warn "Statement could not be prepared! Aborting statement!\n"; return undef; }
@@ -266,30 +269,48 @@ sub getMemberByID {
 }
 print ".";
 
-my %shows = ('1' => "Foo", '2' => "Bar", '3' => "Baz"); # until I code the SQL puller for this
+my %shows;
 sub getShowByID {
 	my ($dbh,$sid) = @_;
-# TODO: pull data from DB if key not filled
+	unless (keys %troupes and exists $shows{"$sid"}) {
+		getShowList($dbh);
+	}
 	return $shows{"$sid"};
 }
 print ".";
 
 sub getShowList {
-# TODO: pull data from DB if keys not filled
+	my $dbh = shift;
+	my $st = "SELECT wid,sname FROM work;";
+print "?";
+	my $res = doQuery(3,$dbh,$st,'wid');
+	foreach (%$res) {
+		my %row = %$_;
+		$shows{$row{wid}} = $row{sname};
+	}
 	return \%shows;
 }
 print ".";
 
-my %troupes = ('1' => "Company A", '2' => "Local High School B"); # until I code the SQL puller for this
+my %troupes;
 sub getTroupeByID {
 	my ($dbh,$tid) = @_;
-# TODO: pull data from DB if key not filled
+	unless (keys %troupes and exists $troupes{"$tid"}) {
+		getTroupeList($dbh);
+	}
 	return $troupes{"$tid"};
 }
 print ".";
 
 sub getTroupeList {
-# TODO: pull data from DB if keys not filled
+	my $dbh = shift;
+	my $st = "SELECT tid,tname FROM troupe;";
+print "!";
+	my $res = doQuery(3,$dbh,$st,'tid');
+	foreach (%$res) {
+		my %row = %$_;
+		$troupes{$row{tid}} = $row{tname};
+	}
 	return \%troupes;
 }
 print ".";

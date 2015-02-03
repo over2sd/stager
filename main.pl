@@ -5,9 +5,10 @@ use warnings;
 use utf8;
 
 use Getopt::Long;
-my $version = "0.0.4prealpha";
+my $version = "0.0.5prealpha";
 my $conffilename = 'config.ini';
 my $showhelp = 0;
+$|++;
 GetOptions(
 	'conf|c=s' => \$conffilename,
 	'help|h' => \$showhelp,

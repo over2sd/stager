@@ -440,29 +440,66 @@ sub addRole {
 	$button->hide();
 	my $editbox = $target->insert( HBox => name => 'roleadd', pack => { fill => 'x', expand => 0, }, );
 	my $showbox = labelBox($editbox,"Production",'shobox','v',boxfill => 'x', boxex => 0, labex => 1);
-	my @showlist = values FlexSQL::getShowList();
-	my $work = $showbox->insert( ComboBox => style => cs::DropDown, items => \@showlist, text => '');
+	my $shows = FlexSQL::getShowList($dbh);
+	my @showlist = values $shows;
+	my $work = $showbox->insert( ComboBox => style => cs::DropDown, items => \@showlist, text => '', height => 30 );
 	my $rolebox = labelBox($editbox,"Role",'rolbox','v',boxfill => 'x', labex => 1);
-	my $role = $rolebox->insert( InputLine => text => '' );
+	my $role = $rolebox->insert( InputLine => text => '', pack => { fill => 'x' } );
 	my $ybox = labelBox($editbox,"Year",'ybox','v',labex => 1);
-	my $year = $ybox->insert( InputLine => text => '' );
+	my $year = $ybox->insert( InputLine => text => '', width => 60, maxLen => 4 );
 	my $mbox = labelBox($editbox,"Month",'mbox','v',labex => 1);
-	my $month = $mbox->insert( InputLine => text => '' );
+	my $month = $mbox->insert( InputLine => text => '', width => 30, maxLen => 2 );
 	my $tbox = labelBox($editbox,"Troupe",'tbox','v', bocfill => 'x', labex => 1);
-	my @troupes = values FlexSQL::getTroupeList();
-	my $troupe = $tbox->insert( ComboBox => style => cs::DropDown, items => \@troupes, text => '');
-	my $submitter = $target->insert( Button => text => "Submit button placeholder");
-	$submitter->onClick( sub { print "Not yet coded."; $button->show(); $editbox->destroy(); $submitter->destroy(); } );
+	my $troupes = FlexSQL::getTroupeList($dbh);
+	my @troupelist = values $troupes;
+	my $troupe = $tbox->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => '', height => 30 );
+	my $submitter = $editbox->insert( Button => text => "Submit");
+	$submitter->onClick( sub {
+		my $sid = Common::revGet($work->text,undef,%$shows);
+		my $tid = Common::revGet($troupe->text,undef,%$troupes);
+		unless (defined $sid) {
+			print "New show: " . $work->text . " will be added to database.\n";
+			my $st = "INSERT INTO work (sname) VALUES(?);";
+			my $res = FlexSQL::doQuery(2,$dbh,$st,$work->text);
+			print "(not yet coded) ($res)";
+			$st = "SELECT wid FROM work WHERE sname=?;";
+			$res = FlexSQL::doQuery(0,$dbh,$st,$work->text);
+			print "SID: $res\n";
+			return;
+		}
+		unless (defined $tid) {
+			print "New troupe: " . $troupe->text . " will be added to database.\n";
+			my $st = "INSERT INTO troupe (tname) VALUES(?);";
+			my $res = FlexSQL::doQuery(2,$dbh,$st,$troupe->text);
+			print "(not yet coded) ($res)";
+			$st = "SELECT tid FROM troupe WHERE tname=?;";
+			$res = FlexSQL::doQuery(0,$dbh,$st,$troupe->text);
+			print "TID: $res\n";
+			return;
+		}
+		print "-> " . ($sid or "undef") . ": " . $role->text . " (" . ($tid or "undef") . ", " . $month->text . "/" . $year->text . ")";
+		$button->show();
+		$editbox->destroy();
+		$submitter->destroy();
+	} );
 print "Loading of roles for member #$mid is not yet coded.\n";
 }
 print ".";
 
 sub showRole {
-	my ($target,$sid,$tid,$role,$y,$m) = @_;
-	$tname = FlexSQL::getTroupeByID($tid);
-	$sname = FlexSQL::getShowByID($sid);
-	$target->insert( Label => text => "$sname: $role ($tname, $m/$y)" );
+	my ($target,$rid,$sid,$tid,$role,$y,$m) = @_;
+	my $tname = FlexSQL::getTroupeByID($tid);
+	my $sname = FlexSQL::getShowByID($sid);
+	my $row = labelBox($target,"$sname: $role ($tname, $m/$y)",'h');
+	my $editbut = $row->insert( Button => text => "Edit role ($rid)" );
+# replace this with a row builder that puts the role and an edit button in a row in the target.
 	return 0;
+}
+print ".";
+
+sub storeNewRole {
+	my ($dbh,$sid,$tid,$y,$m,$role,$target) = @_;
+
 }
 print ".";
 
