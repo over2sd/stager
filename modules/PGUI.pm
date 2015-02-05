@@ -245,9 +245,11 @@ print ".";
 # make a scrolled window
 	my @tabtexts;
 	my @tabs = qw[ mem rol ];
+	push(@tabs,'sho') if config('UI','showprodlist');
 	foreach (@tabs) { # because tabs are controlled by option, tabnames must also be.
 		if (/mem/) { push(@tabtexts,(config('Custom',$_) or "Members")); }
 		elsif (/rol/) { push(@tabtexts,(config('Custom',$_) or "Roles")); }
+		elsif (/sho/) { push(@tabtexts,(config('Custom',$_) or "Show")); }
 	}
 	$$gui{tablist} = \@tabs;
 	my %args;
@@ -276,6 +278,7 @@ print ".";
 	} else {
 		foreach (@$res) {
 			my @a = @$_;
+			# TODO: use $a[2] (member ID) to count roles from roles table
 			my $text = "$a[1], $a[0]"; # concatenate famname, givname and put a label in the window.
 			my $button = $target->insert( Button =>
 				text => $text,
@@ -283,12 +286,23 @@ print ".";
 				pack => { fill => 'x' },
 				onClick => sub { showRoleEditor($gui,$dbh,$a[2]); }# link button to role editor
 				);
-			# TODO: use $a[2] (member ID) to count roles from roles table
 		}
 	}
 	$$gui{rolepage} = $$gui{tabbar}->insert_to_page(1, VBox => name => "role details", pack => { fill => 'both', expand => 1, side => 'left', });
 	my $memtext = (config("Custom",'mem') or "Members");
 	$$gui{rolepage}->insert( Label => text => "Click on a member name on the $memtext page to fill this tab.", height => 60, pack => { fill => 'both', } );
+	if (config('UI','showprodlist')) {
+		$$gui{prodpage} = $$gui{tabbar}->insert_to_page(2, VBox => name => "show cast list", pack => { fill => 'both', expand => 1, side => 'left', });
+		my $selshowrow = labelBox($$gui{prodpage},"Select show and troupe:",'selbox','h', boxfill => 'x', boxex => 0,);
+		my $shows = FlexSQL::getShowList($dbh);
+		my @showlist = values $shows;
+		my $work = $selshowrow->insert( ComboBox => style => cs::DropDown, items => \@showlist, text => '', height => 30 );
+		my $troupes = FlexSQL::getTroupeList($dbh);
+		my @troupelist = values $troupes;
+		my $troupe = $selshowrow->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => (config('InDef','troupe') or ''), height => 30 );
+		my $castlist = $$gui{prodpage}-> insert( VBox => name => 'castbox', pack => { fill => 'both', expand => 0, });
+		$selshowrow->insert( Button => text => "Show Cast/Crew", onClick => sub { my $sid = Common::revGet($work->text,undef,%$shows); my $tid = Common::revGet($troupe->text,undef,%$troupes); castShow($dbh,$castlist,$sid,$tid); } );
+	}
 	$$gui{status}->push("Ready.");
 print " Done.";
 }
@@ -311,6 +325,7 @@ sub showRoleEditor {
 		# list info
 		my $nametxt = "Name: $row{givname} $row{famname}";
 		my $meminfo = labelBox($$gui{rolepage},$nametxt,"Roles",'v');
+		$meminfo->insert( Button => text => "Edit", onClick => sub { devHelp($meminfo,"Editing of member information"); } );
 		# TODO: member edit button
 		if (config("UI","showcontact")) {
 			$meminfo->insert( Label => text => "E-mail: $row{email}" );
@@ -494,7 +509,7 @@ sub showRole {
 	my $tname = FlexSQL::getTroupeByID($dbh,$tid);
 	my $sname = FlexSQL::getShowByID($dbh,$sid);
 	my $row = labelBox($target,"$sname: $role ($tname, $m/$y)",'rolerow','h', boxfill => 'x', labfill => 'none');
-	my $editbut = $row->insert( Button => text => "Edit role", onClick => sub { sayBox($target,"Editing of roles is on the developer's TODO list.\nIf you'd like to help, check out the project's GitHub repo."); } );
+	my $editbut = $row->insert( Button => text => "Edit role", onClick => sub { devHelp($target,"Editing of roles"); } );
 	return 0;
 }
 print ".";
@@ -517,6 +532,42 @@ print ".";
 sub aboutBox {
 	my $w = getGUI('mainWin');
 	sayBox($w,"Stager is a membership tracking program intended for community theatre troupes. If there's anything you'd like to see added to the program, let the developer know.");
+}
+print ".";
+
+sub devHelp {
+	my ($target,$task) = shift;
+	sayBox($target,"$task is on the developer's TODO list.\nIf you'd like to help, check out the project's GitHub repo at http://github.com/over2sd/stager.");
+}
+print ".";
+
+sub castShow {
+	my ($dbh,$target,$sid,$tid) = @_;
+	$target->empty(); # VBox function, clear list
+	$target->insert( Label => text => "Cast/crew of a " . FlexSQL::getTroupeByID($dbh,$tid) . " production of " . FlexSQL::getShowByID($dbh,$sid) . ":" );
+	my $st = "SELECT mid,role FROM cv WHERE work=? AND troupe=? ;";
+	unless (defined $sid and defined $tid) { $target->insert( Label => text => "An error occurred: Invalid role or troupe given.\nIDs could not be secured for both values.", wordWrap => 1, height => 60, pack => { fill => 'both' }, ); return; }
+	my @parms = ($sid,$tid);
+	my $res = FlexSQL::doQuery(4,$dbh,$st,@parms);
+	foreach (@$res) {
+		my $mid = $$_[0];
+		my $name = getMemNameByID($dbh,$mid);
+		my $row = labelBox($target,"$$_[1]: ",'row','h');
+		my $gui = getGUI();
+		$row->insert( Button => text => $name, onClick => sub { showRoleEditor($gui,$dbh,$mid); } );
+	}
+}
+print ".";
+
+sub getMemNameByID {
+	my ($dbh,$mid) = @_;
+	my $text;
+	my $st = "SELECT givname,famname FROM member WHERE mid=?;";
+	my $res = FlexSQL::doQuery(6,$dbh,$st,$mid);
+	return '' unless defined $res;
+	# TODO?: add a column allowing name order to be stored for i18n?
+	$text = "$$res{givname} $$res{famname}";
+	return $text;
 }
 print ".";
 

@@ -282,7 +282,6 @@ print ".";
 sub getShowList {
 	my $dbh = shift;
 	my $st = "SELECT wid,sname FROM work;";
-print "?";
 	my $res = doQuery(3,$dbh,$st,'wid');
 	foreach (%$res) {
 		my %row = %$_;
@@ -305,7 +304,6 @@ print ".";
 sub getTroupeList {
 	my $dbh = shift;
 	my $st = "SELECT tid,tname FROM troupe;";
-print "!";
 	my $res = doQuery(3,$dbh,$st,'tid');
 	foreach (%$res) {
 		my %row = %$_;
