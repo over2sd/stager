@@ -11,6 +11,7 @@ $::wantUnicodeInput = 1;
 use GK qw( VBox Table );
 
 use FIO qw( config );
+#use Options;
 
 sub Pdie {
 	my $message = shift;
@@ -25,14 +26,14 @@ sub Pwait {
 }
 
 sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
-	my $self = shift;
+	my $gui = shift;
 	my $menus = [
 		[ '~File' => [
 #			['~Export', sub { message('export!') }],
 #			['~Synchronize', 'Ctrl-S', '^S', sub { message('synch!') }],
-#			['~Preferences', \&callOptBox],
+#			['~Preferences', sub { Options::mkOptBox($gui,getOpts()); }],
 			[],
-			['Close', 'Ctrl-W', km::Ctrl | ord('W'), sub { $self->close() } ],
+			['Close', 'Ctrl-W', km::Ctrl | ord('W'), sub { $$gui{mainWin}->close() } ],
 		]],
 		[ '~Help' => [
 			['~About', \&aboutBox],
@@ -63,10 +64,10 @@ sub createMainWin {
 		$window->size($w,$h);
 		$window->place( x => (config('Main','left') or 40), rely => 1, y=> -(config('Main','top') or 30), anchor => "nw");
 	}
-	$window->set( menuItems => buildMenus($window));
+	$windowset{mainWin} = $window;
+	$window->set( menuItems => buildMenus(\%windowset));
 
 	#pack it all into the hash for main program use
-	$windowset{mainWin} = $window;
 	$windowset{status} = getStatus($window);
 	return \%windowset;
 }
@@ -240,7 +241,6 @@ print ".";
 
 sub populateMainWin {
 	my ($dbh,$gui,$refresh) = @_;
-print ".";
 	$$gui{status}->push(($refresh ? "Reb" : "B") . "uilding UI...");
 # make a scrolled window
 	my @tabtexts;
@@ -277,6 +277,7 @@ print ".";
 		Pdie("Error: Database access yielded undef!");
 	} else {
 		foreach (@$res) {
+			print ".";
 			my @a = @$_;
 			# TODO: use $a[2] (member ID) to count roles from roles table
 			my $text = "$a[1], $a[0]"; # concatenate famname, givname and put a label in the window.
@@ -337,7 +338,6 @@ sub showRoleEditor {
 		my $res = FlexSQL::doQuery(3,$dbh,$st,$mid,'rid');
 		foreach (keys %$res) { # list roles, with edit button for each role
 			my %row = %{ $$res{$_} };
-			print "$row{rid}: $row{role}";
 			showRole($dbh,$roletarget,$row{rid},$row{work},$row{troupe},$row{role},$row{year},$row{month});
 		}
 		# place add role button
@@ -491,7 +491,7 @@ sub addRole {
 			$res = FlexSQL::doQuery(0,$dbh,$st,$troupe->text);
 			$tid = $res unless ($DBI::err);
 		}
-		print "-> " . ($sid or "undef") . ": " . $role->text . " (" . ($tid or "undef") . ", " . $month->text . "/" . $year->text . ")";
+#		print "-> " . ($sid or "undef") . ": " . $role->text . " (" . ($tid or "undef") . ", " . $month->text . "/" . $year->text . ")";
 		if (defined $sid and defined $tid) {
 			storeNewRole($dbh,$mid,$sid,$tid,$year->text,$month->text,$role->text,$target);
 		} else {
@@ -509,6 +509,7 @@ sub showRole {
 	my $tname = FlexSQL::getTroupeByID($dbh,$tid);
 	my $sname = FlexSQL::getShowByID($dbh,$sid);
 	my $row = labelBox($target,"$sname: $role ($tname, $m/$y)",'rolerow','h', boxfill => 'x', labfill => 'none');
+	$row->backColor(convertColor(config('UI','rolebg') or "#99f"));
 	my $editbut = $row->insert( Button => text => "Edit role", onClick => sub { devHelp($target,"Editing of roles"); } );
 	return 0;
 }
@@ -568,6 +569,62 @@ sub getMemNameByID {
 	# TODO?: add a column allowing name order to be stored for i18n?
 	$text = "$$res{givname} $$res{famname}";
 	return $text;
+}
+print ".";
+
+sub getOpts {
+	# First hash key (when sorted) MUST be a label containing a key that corresponds to the INI Section for the options that follow it!
+	# EACH Section needs a label conaining the Section name in the INI file where it resides.
+	my %opts = (
+		'000' => ['l',"General",'Main'],
+		'001' => ['c',"Save window positions",'savepos'],
+##		'002' => ['x',"Foreground color: ",'fgcol',"#00000"],
+##		'003' => ['x',"Background color: ",'bgcol',"#CCCCCC"],
+		'004' => ['c',"Errors are fatal",'fatalerr'],
+
+		'005' => ['l',"Import/Export",'ImEx'],
+
+		'010' => ['l',"Database",'DB'],
+		'011' => ['r',"Database type:",'type',0,'M','MySQL','L','SQLite'],
+		'012' => ['t',"Server address:",'host'],
+		'013' => ['t',"Login name (if required):",'user'],
+		'014' => ['c',"Server requires password",'password'],
+##		'019' => ['r',"Conservation priority",'conserve',0,'mem',"Memory",'net',"Network traffic (requires synchronization)"],
+
+		'030' => ['l',"User Interface",'UI'],
+		'032' => ['c',"Show production tab",'showprodlist'],
+		'031' => ['s',"Notebook tab position: ",'tabson',1,"left","top","right","bottom"],
+		'033' => ['c',"Show member contact in role listing",'showcontact'],
+		'043' => ['x',"Background for role list",'rolebg',"#EEF"],
+
+#		'050' => ['l',"Fonts",'Font'],
+#		'054' => ['f',"Tab font/size: ",'label'],
+#		'051' => ['f',"General font/size: ",'body'],
+#		'053' => ['f',"Special font/size: ",'special'], # for lack of a better term
+
+		'060' => ['l',"Input Defaults",'InDef'],
+		'061' => ['t',"Troupe/Theatre:",'troupe'],
+		'062' => ['t',"City:",'city'],
+		'063' => ['t',"State:",'state'],
+		'064' => ['t',"Postal Code:",'ZIP'],
+		'065' => ['t',"E-mail:",'email'],
+
+		'070' => ['l',"Custom Text",'Custom'],
+		'072' => ['t',"Members:",'mem'],
+		'073' => ['t',"Role:",'rol'],
+		'071' => ['t',"Stager:",'program'],
+		'074' => ['t',"Show:",'sho'],
+		'076' => ['t',"Options dialog",'options'],
+
+		'ff0' => ['l',"Debug Options",'Debug'],
+		'ff1' => ['c',"Colored terminal output",'termcolors']
+	);
+	return %opts;
+}
+print ".";
+
+sub refreshUI {
+	print "Refreshing UI...(does nothing yet)\n";
 }
 print ".";
 

@@ -5,7 +5,7 @@ use warnings;
 use utf8;
 
 use Getopt::Long;
-my $version = "0.0.7prealpha";
+my $version = "0.0.8prealpha";
 my $conffilename = 'config.ini';
 my $showhelp = 0;
 $|++;
@@ -19,6 +19,9 @@ if ($showhelp) {
 	print "All other options are controlled from within the GUI.\n";
 	exit(0);
 }
+#use lib "./mats/";
+#use Options;
+#Options::mkOptBox($gui,PGUI::getOpts());
 use lib "./modules/";
 
 # print "Loading modules...";
