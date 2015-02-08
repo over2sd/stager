@@ -597,8 +597,8 @@ sub getOpts {
 		'033' => ['c',"Show member contact in role listing",'showcontact'],
 		'043' => ['x',"Background for role list",'rolebg',"#EEF"],
 
-#		'050' => ['l',"Fonts",'Font'],
-#		'054' => ['f',"Tab font/size: ",'label'],
+		'050' => ['l',"Fonts",'Font'],
+		'054' => ['f',"Tab font/size: ",'label'],
 #		'051' => ['f',"General font/size: ",'body'],
 #		'053' => ['f',"Special font/size: ",'special'], # for lack of a better term
 

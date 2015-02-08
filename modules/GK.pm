@@ -27,11 +27,13 @@ sub build {
 	}
 	my $lab = Prima::InputLine->new(
 		owner => $self,
+		name => 'coltxt',
 		text => $exargs->{color},
 		pack => { fill => 'x', expand => 1, padx => 3, side => "left", },
 	);
 	my $swatch = Prima::Button->new(
 		owner => $self,
+		name => 'colbut',
 		text => "",
 		readOnly => 1,
 		selectable => 0,
@@ -51,6 +53,24 @@ sub build {
 	$lab->set(onChange => sub { matchColor($lab,$swatch); });
 	$self->arrange();
 	return $lab; # for signal connection, value pulling, etc.
+}
+
+sub getKid {
+	my ($self,$target) = @_;
+	foreach ($self->get_widgets()) {
+		return $_ if ($_->name eq $target);
+	}
+	return undef;
+}
+
+sub getSwatch {
+	my $self = shift;
+	return getKid($self,'colbut');
+}
+
+sub getEntry {
+	my $self = shift;
+	return getKid($self,'coltxt');
 }
 
 sub matchColor {
@@ -88,7 +108,7 @@ sub build {
 			pack => { fill => "none", expand => 0, },
 			);
 	}
-	my $font = stringToFont($$exargs{font} or "");
+	my $font = stringToFont($$exargs{font} or "Arial 14");
 	my $lab = Prima::InputLine->new(
 		owner => $self,
 		readOnly => 1,
@@ -100,7 +120,7 @@ sub build {
 	$self->insert(Button =>
 		text => "Choose",
 		onClick => sub {
-			$font = FontButton::clicked($lab->font());
+			$font = FontRow::clicked($lab->font());
 			if (defined $font) {
 				$lab->font($font); # TODO: Make this set only the face, not the size (unless an accessibility option is enabled?)
 				$lab->text(getFontString($font));
@@ -161,6 +181,13 @@ sub arrange { # TODO: "reverse" option
 	my $self = shift;
 	foreach ($self->get_widgets()) {
 		$_->pack(side => "left");
+	}
+}
+
+sub empty {
+	my $self = shift;
+	foreach ($self->get_widgets()) {
+		$_->destroy();
 	}
 }
 print ".";
