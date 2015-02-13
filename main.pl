@@ -5,7 +5,7 @@ use warnings;
 use utf8;
 
 use Getopt::Long;
-my $version = "0.0.9prealpha";
+my $version = "0.0.10prealpha";
 my $conffilename = 'config.ini';
 my $showhelp = 0;
 $|++;
@@ -30,12 +30,6 @@ use FlexSQL;
 use PGUI;
 print "\nStarting GUI...\n";
 my $gui = PGUI::createMainWin($version);
-
-
-
-#use lib "./mats/";
-#use Options;
-#Options::mkOptBox($gui,PGUI::getOpts());
 
 
 

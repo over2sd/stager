@@ -11,7 +11,7 @@ $::wantUnicodeInput = 1;
 use GK qw( VBox Table );
 
 use FIO qw( config );
-#use Options;
+use Options;
 
 sub Pdie {
 	my $message = shift;
@@ -31,7 +31,7 @@ sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
 		[ '~File' => [
 #			['~Export', sub { message('export!') }],
 #			['~Synchronize', 'Ctrl-S', '^S', sub { message('synch!') }],
-#			['~Preferences', sub { Options::mkOptBox($gui,getOpts()); }],
+			['~Preferences', sub { Options::mkOptBox($gui,getOpts()); }],
 			[],
 			['Close', 'Ctrl-W', km::Ctrl | ord('W'), sub { $$gui{mainWin}->close() } ],
 		]],

@@ -7,6 +7,71 @@ require Exporter;
 @EXPORT = qw( ColorRow FontRow VBox HBox Table );
 use Prima qw(Application Buttons MsgBox FrameSet);
 
+package XButtons; # Exclusive buttons group (radio checkboxes)
+#use parent -norequire, 'VBox';
+use vars qw(@ISA);
+@ISA = qw(Prima::Widget);
+
+my %profile = ( side => "top", );
+
+sub build {
+	my ($self,$text,$default,@opts) = @_;
+	$self{value} = $opts[$default*2];
+	$self->insert( Label => text => $text );
+	my %buttons = @opts;
+	foreach (keys %buttons) {
+		my $b = $self->insert( Button => checkable => 1, text => $buttons{$_}, name => $_ );
+		my $v = $_;
+		$b->checked(1) if ($_ eq $self{value});
+		$b->onClick( sub { $self->xClick($b); });
+	}
+}
+
+sub xClick {
+	my ($self,$b) = @_;
+	foreach ($self->get_widgets()) {
+		next unless $_-> isa(q(Prima::Button));
+		unless ("$b" eq "$_") {
+			$_->checked(0);
+			$_->enabled(1);
+		} else {
+			$_->checked(1);
+			$self->value($_->name);
+			$self-> notify(q(Change));
+			$_->enabled(0);
+		}
+	}
+}
+
+sub value {
+	my ($self,$newval) = @_;
+	$self{value} = $newval if (defined $newval);
+	return $self{value} or undef;
+}
+
+sub insert {
+	my ($self,$class,@args) = @_;
+	my $child = $self->SUPER::insert($class,@args);
+	$child->pack(side => $profile{side});
+	return $child;
+}
+
+sub arrange {
+	my ($self,$newside) = @_;
+	$profile{side} = $newside if (defined $newside);
+	foreach ($self->get_widgets()) {
+		$_->pack(side => $profile{side});
+	}
+}
+
+sub empty {
+	my $self = shift;
+	foreach ($self->get_widgets()) {
+		$_->destroy();
+	}
+}
+print ".";
+
 package ColorRow; #Replaces Gtk2::ColorSelectionDialog
 # EXAMPLE:
 #my $colRow = ColorRow->new(

@@ -1,5 +1,5 @@
-Options dialog
-Show tab: dropdown for troupe and production title - lists members involved in that show when submit button is clicked
 Role editing window, for fixing mistakes in role information
 role type field for add/edit roles
 Fix doQuery so that mode 3 returns an array of hashrefs instead of a hashref of hashref of hashref nonsense
+Normalize XButtons class with add/remove button methods and change name of build to buildfromhash
+
