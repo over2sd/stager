@@ -160,5 +160,16 @@ sub shorten {
 }
 print ".";
 
+sub getAge {
+	my $dob = shift; # expects date as "YYYY-MM-DD" or "YYYYMMDD"
+	use DateTime;
+	$dob=~/([0-9]{4})-?([0-9]{2})-?([0-9]{2})/; # DATE field format from MySQL. May not work for other sources of date.
+	my $start = DateTime->new( year => $1, month => $2, day => $3);
+	my $end = DateTime->now;
+	my $age = $end - $start;
+	return $age->in_units('years');
+}
+print ".";
+
 print " OK; ";
 1;

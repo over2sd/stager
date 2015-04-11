@@ -245,11 +245,15 @@ sub populateMainWin {
 # make a scrolled window
 	my @tabtexts;
 	my @tabs = qw[ mem rol ];
+	$tabs[0] = 'cas' if config('UI','splitmembers');
 	push(@tabs,'sho') if config('UI','showprodlist');
 	foreach (@tabs) { # because tabs are controlled by option, tabnames must also be.
 		if (/mem/) { push(@tabtexts,(config('Custom',$_) or "Members")); }
+		elsif (/cas/) { push(@tabtexts,(config('Custom',$_) or "Cast")); }
+		elsif (/bsc/) { push(@tabtexts,(config('Custom',$_) or "Crew")); }
 		elsif (/rol/) { push(@tabtexts,(config('Custom',$_) or "Roles")); }
 		elsif (/sho/) { push(@tabtexts,(config('Custom',$_) or "Show")); }
+		elsif (/ang/) { push(@tabtexts,(config('Custom',$_) or "Angels")); }
 	}
 	$$gui{tablist} = \@tabs;
 	my %args;
@@ -324,7 +328,11 @@ sub showRoleEditor {
 	my %row = %$res;
 	if (keys %row) {
 		# list info
-		my $nametxt = "Name: $row{givname} $row{famname}";
+		my $age = 0;
+		if (defined $row{dob}) {
+			$age = Common::getAge($row{dob});
+		}
+		my $nametxt = "Name: $row{givname} $row{famname} (age " . ($age ? $age : "unknown") . ")";
 		my $meminfo = labelBox($$gui{rolepage},$nametxt,"Roles",'v');
 		$meminfo->insert( Button => text => "Edit", onClick => sub { devHelp($meminfo,"Editing of member information"); } );
 		# TODO: member edit button
@@ -377,9 +385,9 @@ sub addMember {
 	my $mphone = $vbox->insert( InputLine => maxLen => 10, width => 150, text => '##########', );
 	$vbox->insert( Label => text => "E-mail Address" );
 	my $email = $vbox->insert( InputLine => maxLen => 254, text => (config('InDef','email') or 'user@example.com'), pack => { fill => 'x', } );
-	my $abox = labelBox($vbox,"Age (or A for adult 21+ )",'abox','h',boxfill => 'x');
+	my $abox = labelBox($vbox,"Birthdate (YYYYMMDD)",'abox','h',boxfill => 'x');
 # TODO: Add calendar button for date of birth? (if option selected?)
-	my $age = $abox->insert( InputLine => maxLen => 3, width => 45, text => '', );
+	my $dob = $abox->insert( InputLine => maxLen => 8, width => 120, text => '', );
 	$vbox->insert( Label => text => "Street Address" );
 	my $address = $vbox->insert( InputLine => maxLen => 253, text => '', pack => { fill => 'x', } );
 	my $cbox = $vbox->insert( HBox => name => 'citybox', pack => { expand => 1, }, );
@@ -389,6 +397,11 @@ sub addMember {
 	my $city = $cbox1->insert( InputLine => maxLen => 99, text => (config('InDef','city') or ''), pack => { fill => 'x', expand => 1} );
 	my $state = $cbox2->insert( InputLine => maxLen => 3, text => (config('InDef','state') or ''), width => 45, );
 	my $zip = $cbox3->insert( InputLine => maxLen => 10, text => (config('InDef','ZIP') or ''), );
+#	if (config('UI','splitmembers') {
+		my $mtbox = labelBox($vbox,"Type:",'rb','h');
+		my $cbcast = $mtbox->insert( CheckBox => text => "Cast" );
+		my $cbcrew = $mtbox->insert( CheckBox => text => "Crew" );
+#	}
 # TODO: Add radio button for member types?
 	my %user;
 	$vbox->insert( Button =>
@@ -406,11 +419,16 @@ sub addMember {
 			$user{hphone} = $hphone->text if ($hphone->text ne '##########');
 			$user{mphone} = $mphone->text if ($mphone->text ne '##########');
 			$user{email} = $email->text if ($email->text ne (config('InDef','email') or 'user@example.com'));
-			$user{age} = $age->text if ($age->text ne '');
+			$user{dob} = "'" . $dob->text . "'" if ($dob->text ne '');
 			$user{address} = $address->text if ($address->text ne '');
 			$user{city} = $city->text if ($city->text ne '' && $address->text ne '');
 			$user{state} = $state->text if ($state->text ne '' && $address->text ne '');
 			$user{zip} = $zip->text if ($zip->text ne '' && $address->text ne '');
+#			if (config('UI','splitmembers') {
+				$user{memtype} = 0;
+				$user{memtype} += 1 if $cbcast->checked;
+				$user{memtype} += 2 if $cbcrew->checked;
+#			}
 			$addbox->destroy();
 			# store information
 			my ($error,$cmd,@parms) = FlexSQL::prepareFromHash(\%user,'member',0);
@@ -537,7 +555,7 @@ sub aboutBox {
 print ".";
 
 sub devHelp {
-	my ($target,$task) = shift;
+	my ($target,$task) = @_;
 	sayBox($target,"$task is on the developer's TODO list.\nIf you'd like to help, check out the project's GitHub repo at http://github.com/over2sd/stager.");
 }
 print ".";
@@ -596,6 +614,7 @@ sub getOpts {
 		'031' => ['s',"Notebook tab position: ",'tabson',1,"left","top","right","bottom"],
 		'033' => ['c',"Show member contact in role listing",'showcontact'],
 		'043' => ['x',"Background for role list",'rolebg',"#EEF"],
+		'034' => ['c',"Show members in multiple tabs (cast/crew/angels)",'splitmembers'],
 
 		'050' => ['l',"Fonts",'Font'],
 		'054' => ['f',"Tab font/size: ",'label'],

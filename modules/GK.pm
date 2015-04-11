@@ -8,7 +8,6 @@ require Exporter;
 use Prima qw(Application Buttons MsgBox FrameSet);
 
 package XButtons; # Exclusive buttons group (radio checkboxes)
-#use parent -norequire, 'VBox';
 use vars qw(@ISA);
 @ISA = qw(Prima::Widget);
 
