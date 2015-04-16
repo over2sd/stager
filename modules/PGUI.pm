@@ -5,7 +5,8 @@ print __PACKAGE__;
 
 my $PROGNAME = 'Stager';
 
-use Prima qw(Application Buttons MsgBox FrameSet StdDlg Sliders Notebooks ScrollWidget);
+use Prima qw(Application Buttons MsgBox FrameSet StdDlg Sliders Notebooks ScrollWidget ImageViewer);
+use Prima::Image::jpeg; # although I can't see that it's helping.
 $::wantUnicodeInput = 1;
 
 use GK qw( VBox Table );
@@ -332,9 +333,17 @@ sub showRoleEditor {
 		if (defined $row{dob}) {
 			$age = Common::getAge($row{dob});
 		}
-		my $nametxt = "Name: $row{givname} $row{famname} (age " . ($age ? $age : "unknown") . ")";
-		my $meminfo = labelBox($$gui{rolepage},$nametxt,"Roles",'v');
-		$meminfo->insert( Button => text => "Edit", onClick => sub { devHelp($meminfo,"Editing of member information"); } );
+		my $headshot = Prima::Image->new( size => [100,100] );
+		if (defined $row{imgfn}) {
+			$headshot->load("img/" . $row{imgfn}) or $headshot->load("img/noface.png") or sayBox($$gui{rolepage},"Could not load head shot: $@");
+		} else {
+			$headshot->load("img/noface.png") or sayBox($$gui{rolepage},"Could not load head shot placeholder: $@");
+		}
+		my $nametxt = "Name: $row{givname} $row{famname} (" . $row{gender} . " age " . ($age ? $age : "unknown") . ")";
+		my $meminfo = $$gui{rolepage}->insert( VBox => name => "memberinfo", pack => { fill => 'both', expand => 1 }, );
+		my $header = labelBox($meminfo,$nametxt,"Roles",'h', boxfill => 'x', boxex => 1);
+		$header->insert( Button => text => "Edit", onClick => sub { editMember($gui,$dbh,$res); } );
+		$header->insert(ImageViewer => image => $headshot);
 		# TODO: member edit button
 		if (config("UI","showcontact")) {
 			$meminfo->insert( Label => text => "E-mail: $row{email}" );
@@ -360,101 +369,7 @@ print ".";
 
 sub addMember {
 	my ($gui,$dbh,$target) = @_;
-	my $addbox = Prima::Dialog->create(
-		borderStyle => bs::Sizeable,
-		size => [400,400],
-		text => "User Details",
-		owner => $$gui{mainWin},
-		onTop => 1,
-	);
-	$addbox->hide();
-	$::application->yield();
-	my $vbox = $addbox->insert( VBox => name => 'details', pack => { fill => 'both', expand => 1 } );
-	$vbox->insert( Button =>
-		text => "Cancel",
-		onClick => sub { print "Cancelled"; $addbox->destroy(); },
-	);
-	my $namebox = $vbox->insert( HBox => name => 'namebox', pack => { expand => 1, }, );
-	my $nbox1 = labelBox($namebox,"Given Name",'n1','v');
-	my $nbox2 = labelBox($namebox,"Family Name",'n2','v');
-	my $givname = $nbox1->insert( InputLine => maxLen => 23, text => '', );
-	my $famname = $nbox2->insert( InputLine => maxLen => 28, text => '', );
-	$vbox->insert( Label => text => "Home Phone" );
-	my $hphone = $vbox->insert( InputLine => maxLen => 10, width => 150, text => '##########', );
-	$vbox->insert( Label => text => "Mobile/Work Phone" );
-	my $mphone = $vbox->insert( InputLine => maxLen => 10, width => 150, text => '##########', );
-	$vbox->insert( Label => text => "E-mail Address" );
-	my $email = $vbox->insert( InputLine => maxLen => 254, text => (config('InDef','email') or 'user@example.com'), pack => { fill => 'x', } );
-	my $abox = labelBox($vbox,"Birthdate (YYYYMMDD)",'abox','h',boxfill => 'x');
-# TODO: Add calendar button for date of birth? (if option selected?)
-	my $dob = $abox->insert( InputLine => maxLen => 8, width => 120, text => '', );
-	$vbox->insert( Label => text => "Street Address" );
-	my $address = $vbox->insert( InputLine => maxLen => 253, text => '', pack => { fill => 'x', } );
-	my $cbox = $vbox->insert( HBox => name => 'citybox', pack => { expand => 1, }, );
-	my $cbox1 = labelBox($cbox,"City",'c1','v',boxfill => 'x', labfill => 'x');
-	my $cbox2 = labelBox($cbox,"State",'c2','v');
-	my $cbox3 = labelBox($cbox,"ZIP",'c3','v');
-	my $city = $cbox1->insert( InputLine => maxLen => 99, text => (config('InDef','city') or ''), pack => { fill => 'x', expand => 1} );
-	my $state = $cbox2->insert( InputLine => maxLen => 3, text => (config('InDef','state') or ''), width => 45, );
-	my $zip = $cbox3->insert( InputLine => maxLen => 10, text => (config('InDef','ZIP') or ''), );
-#	if (config('UI','splitmembers') {
-		my $mtbox = labelBox($vbox,"Type:",'rb','h');
-		my $cbcast = $mtbox->insert( CheckBox => text => "Cast" );
-		my $cbcrew = $mtbox->insert( CheckBox => text => "Crew" );
-#	}
-# TODO: Add radio button for member types?
-	my %user;
-	$vbox->insert( Button =>
-		text => "Add User",
-		onClick => sub {
-			$addbox->hide();
-			# process information
-			unless ($famname->text ne '' && $givname->text ne '') {
-				sayBox($addbox,"Required fields: Family Name, Given Name");
-				$addbox->show();
-				return;
-			}
-			$user{famname} = $famname->text;
-			$user{givname} = $givname->text;
-			$user{hphone} = $hphone->text if ($hphone->text ne '##########');
-			$user{mphone} = $mphone->text if ($mphone->text ne '##########');
-			$user{email} = $email->text if ($email->text ne (config('InDef','email') or 'user@example.com'));
-			$user{dob} = "'" . $dob->text . "'" if ($dob->text ne '');
-			$user{address} = $address->text if ($address->text ne '');
-			$user{city} = $city->text if ($city->text ne '' && $address->text ne '');
-			$user{state} = $state->text if ($state->text ne '' && $address->text ne '');
-			$user{zip} = $zip->text if ($zip->text ne '' && $address->text ne '');
-#			if (config('UI','splitmembers') {
-				$user{memtype} = 0;
-				$user{memtype} += 1 if $cbcast->checked;
-				$user{memtype} += 2 if $cbcrew->checked;
-#			}
-			$addbox->destroy();
-			# store information
-			my ($error,$cmd,@parms) = FlexSQL::prepareFromHash(\%user,'member',0);
-			if ($error) { sayBox($$gui{mainWin},"Preparing user add statement failed: $error - $parms[0]"); return; }
-			$error = FlexSQL::doQuery(2,$dbh,$cmd,@parms);
-			unless ($error == 1) { sayBox($$gui{mainWin},"Adding user to database failed: $error"); return; }
-			$cmd = "SELECT givname, famname, mid FROM member WHERE famname=? AND givname=?;";
-			@parms = ($user{famname},$user{givname});
-			my $res = FlexSQL::doQuery(4,$dbh,$cmd,@parms);
-			unless (defined $res) {
-				Pdie("Error: Database access yielded undef!");
-			} else {
-				foreach (@$res) {
-					my @a = @$_;
-					my $text = "$a[1], $a[0]"; # concatenate famname, givname and put a label in the window.
-					my $button = $target->insert( Button =>
-						text => $text,
-						alignment => ta::Left,
-						pack => { fill => 'x' },
-						onClick => sub { showRoleEditor($gui,$dbh,$a[2]); }# link button to role editor
-					);
-				}
-			}
-		}
-	);
-	$addbox->show();
+	editMemberDialog($gui,$dbh,(config('Custom','okadd') or "Add Member"),0,$target,());
 }
 print ".";
 
@@ -634,6 +549,9 @@ sub getOpts {
 		'071' => ['t',"Stager:",'program'],
 		'074' => ['t',"Show:",'sho'],
 		'076' => ['t',"Options dialog",'options'],
+		'075' => ['t',"Edit member save button",'okedit'],
+		'077' => ['t',"Add member save button",'okadd'],
+		'078' => ['t',"User details dialog title",'udetail'],
 
 		'ff0' => ['l',"Debug Options",'Debug'],
 		'ff1' => ['c',"Colored terminal output",'termcolors']
@@ -644,6 +562,127 @@ print ".";
 
 sub refreshUI {
 	print "Refreshing UI...(does nothing yet)\n";
+}
+print ".";
+
+sub editMember {
+	my ($gui,$dbh,$user) = @_;
+	editMemberDialog($gui,$dbh,(config('Custom','okedit') or "Save"),1,undef,%$user);
+}
+print ".";
+
+sub editMemberDialog {
+	my ($gui,$dbh,$buttontext,$isupdate,$target,%user) = @_;
+	my %user2;
+	my $addbox = Prima::Dialog->create(
+		borderStyle => bs::Sizeable,
+		size => [400,400],
+		text => (config('Custom','udetail') or "User Details"),
+		owner => $$gui{mainWin},
+		onTop => 1,
+	);
+	$addbox->hide();
+	$::application->yield();
+	my $vbox = $addbox->insert( VBox => name => 'details', pack => { fill => 'both', expand => 1 } );
+	$vbox->insert( Button =>
+		text => "Cancel",
+		onClick => sub { print "Cancelled"; $addbox->destroy(); return undef; },
+	);
+	my $namebox = $vbox->insert( HBox => name => 'namebox', pack => { expand => 1, }, );
+	my $nbox1 = labelBox($namebox,"Given Name",'n1','v');
+	my $nbox2 = labelBox($namebox,"Family Name",'n2','v');
+	my $givname = $nbox1->insert( InputLine => maxLen => 23, text => ($user{givname} or ''), );
+	my $famname = $nbox2->insert( InputLine => maxLen => 28, text => ($user{famname} or ''), );
+	my $phonbox = $vbox->insert( HBox => name => 'phones', pack => { fill => 'x', expand => 1, }, );
+	my $hpbox = labelBox($phonbox,"Home Phone",'pb1','v');
+	my $hphone = $hpbox->insert( InputLine => maxLen => 10, width => 150, text => ($user{hphone} or '##########'), );
+	my $mpbox = labelBox($phonbox,"Mobile/Work Phone",'pb2','v');
+	my $mphone = $mpbox->insert( InputLine => maxLen => 10, width => 150, text => ($user{mphone} or '##########'), );
+	$vbox->insert( Label => text => "E-mail Address" );
+	my $email = $vbox->insert( InputLine => maxLen => 254, text => ($user{email} or config('InDef','email') or 'user@example.com'), pack => { fill => 'x', } );
+	my $abox = labelBox($vbox,"Birthdate (YYYYMMDD)",'abox','h',boxfill => 'x');
+# TODO: Add calendar button for date of birth? (if option selected?)
+	my $dob = $abox->insert( InputLine => maxLen => 10, width => 120, text => ($user{dob} or ''), );
+	$vbox->insert( Label => text => "Street Address" );
+	my $address = $vbox->insert( InputLine => maxLen => 253, text => ($user{address} or ''), pack => { fill => 'x', } );
+	my $cbox = $vbox->insert( HBox => name => 'citybox', pack => { expand => 1, }, );
+	my $cbox1 = labelBox($cbox,"City",'c1','v',boxfill => 'x', labfill => 'x');
+	my $cbox2 = labelBox($cbox,"State",'c2','v');
+	my $cbox3 = labelBox($cbox,"ZIP",'c3','v');
+	my $city = $cbox1->insert( InputLine => maxLen => 99, text => ($user{city} or config('InDef','city') or ''), pack => { fill => 'x', expand => 1} );
+	my $state = $cbox2->insert( InputLine => maxLen => 3, text => ($user{state} or config('InDef','state') or ''), width => 45, );
+	my $zip = $cbox3->insert( InputLine => maxLen => 10, text => ($user{zip} or config('InDef','ZIP') or ''), );
+	my $mtbox = labelBox($vbox,"Type:",'rb','h');
+	my $memtype = ($user{memtype} or 0);
+	my $cbcast = $mtbox->insert( CheckBox => text => "Cast", checked => ($memtype & 1) );
+	my $cbcrew = $mtbox->insert( CheckBox => text => "Crew", checked => ($memtype & 2) );
+	my $imbox = labelBox($vbox,"Headshot filename",'im','h', boxex => 1, boxfill => 'x');
+	my $img = $imbox->insert( InputLine => maxLen => 256, text => ($user{imgfn} or 'noface.png'), pack => { fill => 'x', expand => 1, }, );
+	$vbox->insert( Button =>
+		text => $buttontext,
+		onClick => sub {
+			$addbox->hide();
+			# process information
+			unless ($famname->text ne '' && $givname->text ne '') {
+				sayBox($addbox,"Required fields: Family Name, Given Name");
+				$addbox->show();
+				return;
+			}
+			$user2{famname} = $famname->text;
+			$user2{givname} = $givname->text;
+			$user2{hphone} = $hphone->text if ($hphone->text ne '##########');
+			$user2{mphone} = $mphone->text if ($mphone->text ne '##########');
+			$user2{email} = $email->text if ($email->text ne (config('InDef','email') or 'user@example.com'));
+			$user2{dob} = $dob->text if ($dob->text ne '');
+			$user2{address} = $address->text if ($address->text ne '');
+			$user2{city} = $city->text if ($city->text ne '' && $address->text ne '');
+			$user2{state} = $state->text if ($state->text ne '' && $address->text ne '');
+			$user2{zip} = $zip->text if ($zip->text ne '' && $address->text ne '');
+#			if (config('UI','splitmembers') {
+				$user2{memtype} = 0;
+				$user2{memtype} += 1 if $cbcast->checked;
+				$user2{memtype} += 2 if $cbcrew->checked;
+#			}
+			$user2{imgfn} = $img->text if ($img->text ne 'noface.png');
+			$addbox->destroy();
+			unless ($isupdate) {
+				my ($error,$cmd,@parms) = FlexSQL::prepareFromHash(\%user2,'member',0);
+				if ($error) { sayBox($$gui{mainWin},"Preparing user add statement failed: $error - $parms[0]"); return; }
+				$error = FlexSQL::doQuery(2,$dbh,$cmd,@parms);
+				unless ($error == 1) { sayBox($$gui{mainWin},"Adding user to database failed: $error"); return; }
+				$cmd = "SELECT givname, famname, mid FROM member WHERE famname=? AND givname=?;";
+				@parms = ($user{famname},$user{givname});
+				my $res = FlexSQL::doQuery(4,$dbh,$cmd,@parms);
+				unless (defined $res) {
+					Pdie("Error: Database access yielded undef!");
+				} else {
+					foreach (@$res) {
+						my @a = @$_;
+						my $text = "$a[1], $a[0]"; # concatenate famname, givname and put a label in the window.
+						my $button = $target->insert( Button =>
+							text => $text,
+							alignment => ta::Left,
+							pack => { fill => 'x' },
+							onClick => sub { showRoleEditor($gui,$dbh,$a[2]); }# link button to role editor
+						);
+					}
+				}
+			} else {
+				foreach (keys %user2) {
+					delete $user2{$_} if ($user2{$_} eq $user{$_}); # remove unchanged/identical values from update queue.
+				}
+				unless (scalar keys %user2) { sayBox($$gui{mainWin},"Error: No changes made. If cancelling, click cancel."); return undef; } # no changes? return.
+				return undef unless (defined $user{mid}); #Have to know whom we're updating.
+				$user2{mid} = $user{mid}; # put ID key in hash we'll be using for prepare
+				my ($error,$cmd,@parms) = FlexSQL::prepareFromHash(\%user2,'member',1); # prepare update stateent
+				if ($error) { sayBox($$gui{mainWin},"Preparing user update statement failed: $error - $parms[0]"); return; }
+				$error = FlexSQL::doQuery(2,$dbh,$cmd,@parms); # run update statement on database, get back number of rows updated (should be 1)
+				unless ($error == 1) { sayBox($$gui{mainWin},"Updating user information failed: $error"); return; }
+				showRoleEditor($gui,$dbh,$user2{mid});# reshow role editor (only makes visible changes to name, age, and possibly contact info
+			} # end else (updating info)
+		} # end OK button subroutine
+	); # End of button bar under details
+	$addbox->show(); # reveal our handiwork!!
 }
 print ".";
 

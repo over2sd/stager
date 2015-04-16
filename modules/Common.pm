@@ -171,5 +171,12 @@ sub getAge {
 }
 print ".";
 
+sub stripDOBdashes {
+	my $dob = shift; # expects date as "YYYY-MM-DD" or "YYYYMMDD"
+	$dob=~/([0-9]{4})-?([0-9]{2})-?([0-9]{2})/; # DATE field format from MySQL. May not work for other sources of date.
+	return "$1$2$3";
+}
+print ".";
+
 print " OK; ";
 1;

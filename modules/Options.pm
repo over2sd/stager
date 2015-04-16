@@ -42,13 +42,13 @@ sub mkOptBox {
 	foreach my $k (sort keys %opts) {
 		my @o = @{ $opts{$k} };
 		if ($o[0] eq "l") { # label for tab
+			if (defined $curtab) { $curtab->insert( Label => text => " - - - ", pack => { fill => 'both', expand => 1, }, ); }
 			$curtab = $pages->insert_to_page($page,VBox => name => 'page$page', pack => { fill => "both", expand => 1 }, ); # make a vbox to put all the options in a given Section in
 			my $l = $curtab->insert( Label => text => $o[1] ); # for each section, make a notebook page
 #			$curtab = PGUI::labelBox($pages,$o[1],$o[2],'v');
 			$section = $o[2];
 			$page++;
 		}elsif (defined $section and defined $curtab) { # not first option in list
-				my $s = $section;
 			addModOpts($curtab,$section,\$changes,$pos,$saveB,$toSave,@o); # build and add option to page
 #print "Opt-$k: " . join(", ",@o) . "\n";
 			$pos++;
@@ -195,7 +195,7 @@ print ".";
 sub buildComboRow {
 	my ($box,$options,$applyBut,$lab,$s,$key,$d,$changes,$pos,$optyp,@presets) = @_;
 	if ($d =~ m/^#/) { $d = 0; } # if passed a hex code
-	my $row = PGUI::labelBox( $box,$lab,'comborow','h');
+	my $row = PGUI::labelBox( $box,$lab,'comborow','h', boxex => 0, labex => 0) unless ($optyp eq 'r');
 	if ($optyp eq 's') {
 		$d = int($d); # cast as a number
 		my $selected = -1;
@@ -206,7 +206,7 @@ sub buildComboRow {
 		my $c = $row->insert( ComboBox => style => cs::DropDown, items => \@presets, text => (config($s,$key) or ''), height => 30 );
 		$c->onChange( sub { optChange($c,[$changes,$pos,$options,$s,$key,$applyBut,config($s,$key)]); });
 	} elsif ($optyp eq 'r') {
-		my $g = $box-> insert( XButtons => name => $lab, pack => { fill => "both", expand => 1, }, );
+		my $g = $box-> insert( XButtons => name => $lab, pack => { fill => "none", expand => 0, }, );
 		$g->onChange( sub { optChange($g,[$changes,$pos,$options,$s,$key,$applyBut,$d,$g->value()]); }, );
 		$g->arrange("left"); # line up buttons horizontally (TODO: make this an option in the options hash? or depend on text length?)
 		my $current = config($s,$key); # pull current value from config
