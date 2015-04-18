@@ -195,7 +195,7 @@ print ".";
 sub prepareFromHash {
 	my ($href,$table,$update,$extra) = @_;
 	my %tablekeys = (
-		member => ['famname','givname','hphone','mphone','email','age','address','city','state','zip','notes','dob','memtype'],
+		member => ['famname','givname','hphone','mphone','email','gender','address','city','state','zip','notes','dob','memtype','imgfn'],
 		cv => ['mid','show','role','year','month','troupe']
 	);
 	my ($upcolor,$incolor,$basecolor) = ("","","");

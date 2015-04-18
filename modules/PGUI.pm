@@ -259,8 +259,8 @@ sub populateMainWin {
 	$$gui{tablist} = \@tabs;
 	my %args;
 	if (defined config('UI','tabson')) { $args{orientation} = (config('UI','tabson') eq "bottom" ? tno::Bottom : tno::Top); } # set tab position based on config option
+	$$gui{mainvbox} = getGUI("mainWin")->insert( VBox => name => "mainvbox", pack => { fill => "both", expand => 1, }, );
 	$$gui{tabbar} = Prima::TabbedScrollNotebook->create(
-		owner => getGUI("mainWin"),
 		style => tns::Simple,
 		tabs => \@tabtexts,
 		name => 'Scroller',
@@ -268,7 +268,8 @@ sub populateMainWin {
 		pack => { fill => 'both', expand => 1, pady => 3, side => "left", },
 	);
 	$$gui{listpane} = $$gui{tabbar}->insert_to_page(0, VBox => name => "membox", pack => { fill => 'both' } );
-	my $buttonbar = $$gui{listpane}->insert( HBox => name => 'buttons', pack => { side => "top", fill => 'x', expand => 0, }, );
+	my $buttonbar = $$gui{mainvbox}->insert( HBox => name => 'buttons', pack => { side => "left", fill => 'x', expand => 0, }, );
+	$$gui{tabbar}->owner($$gui{mainvbox});
 	my $target = $$gui{listpane}->insert( VBox => name => "Members", pack => { fill => 'both', expand => 1, }, );
 	$buttonbar->insert( Button =>
 		text => "Add a member",
@@ -339,7 +340,7 @@ sub showRoleEditor {
 		} else {
 			$headshot->load("img/noface.png") or sayBox($$gui{rolepage},"Could not load head shot placeholder: $@");
 		}
-		my $nametxt = "Name: $row{givname} $row{famname} (" . $row{gender} . " age " . ($age ? $age : "unknown") . ")";
+		my $nametxt = "Name: $row{givname} $row{famname} ( $row{gender} age " . ($age ? $age : "unknown") . ")";
 		my $meminfo = $$gui{rolepage}->insert( VBox => name => "memberinfo", pack => { fill => 'both', expand => 1 }, );
 		my $header = labelBox($meminfo,$nametxt,"Roles",'h', boxfill => 'x', boxex => 1);
 		$header->insert( Button => text => "Edit", onClick => sub { editMember($gui,$dbh,$res); } );
@@ -404,6 +405,9 @@ sub addRole {
 	my $troupes = FlexSQL::getTroupeList($dbh);
 	my @troupelist = values $troupes;
 	my $troupe = $tbox->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => (config('InDef','troupe') or ''), height => 30 );
+	my $crewbox = labelBox($editbox,"Crew",'cbox','v');
+	my $cbcrew = $crewbox->insert( SpeedButton => checkable => 1, checked => 0, );
+	$cbcrew->onClick( sub { $cbcrew->text($cbcrew->checked ? "Y" : ""); } );
 	my $submitter = $editbox->insert( Button => text => "Submit");
 	$submitter->onClick( sub {
 		my $sid = Common::revGet($work->text,undef,%$shows);
@@ -426,7 +430,7 @@ sub addRole {
 		}
 #		print "-> " . ($sid or "undef") . ": " . $role->text . " (" . ($tid or "undef") . ", " . $month->text . "/" . $year->text . ")";
 		if (defined $sid and defined $tid) {
-			storeNewRole($dbh,$mid,$sid,$tid,$year->text,$month->text,$role->text,$target);
+			storeNewRole($dbh,$mid,$sid,$tid,$year->text,$month->text,$role->text,$cbcrew->checked,$target);
 		} else {
 			sayBox($editbox,"Something went wrong storing the role.");
 		}
@@ -449,9 +453,9 @@ sub showRole {
 print ".";
 
 sub storeNewRole {
-	my ($dbh,$mid,$sid,$tid,$y,$m,$role,$target) = @_;
-	my @parms = ($mid,$sid,$tid,$y,$m,$role);
-	my $st = "INSERT INTO cv (mid,work,troupe,year,month,role) VALUES(?,?,?,?,?,?);";
+	my ($dbh,$mid,$sid,$tid,$y,$m,$role,$crew,$target) = @_;
+	my @parms = ($mid,$sid,$tid,$y,$m,$role,($crew ? 2 : 1));
+	my $st = "INSERT INTO cv (mid,work,troupe,year,month,role,rtype) VALUES(?,?,?,?,?,?,?);";
 	my $res = FlexSQL::doQuery(2,$dbh,$st,@parms);
 	$st = "SELECT rid FROM cv WHERE mid=? AND work=? AND troupe=? AND year=? AND month=? AND role=?;";
 	$res = FlexSQL::doQuery(0,$dbh,$st,@parms);
@@ -522,7 +526,7 @@ sub getOpts {
 		'012' => ['t',"Server address:",'host'],
 		'013' => ['t',"Login name (if required):",'user'],
 		'014' => ['c',"Server requires password",'password'],
-##		'019' => ['r',"Conservation priority",'conserve',0,'mem',"Memory",'net',"Network traffic (requires synchronization)"],
+##		'019' => ['r',"Conservation priority:",'conserve',0,'mem',"Memory",'net',"Network traffic (requires synchronization)"],
 
 		'030' => ['l',"User Interface",'UI'],
 		'032' => ['c',"Show production tab",'showprodlist'],
@@ -603,6 +607,13 @@ sub editMemberDialog {
 	my $abox = labelBox($vbox,"Birthdate (YYYYMMDD)",'abox','h',boxfill => 'x');
 # TODO: Add calendar button for date of birth? (if option selected?)
 	my $dob = $abox->insert( InputLine => maxLen => 10, width => 120, text => ($user{dob} or ''), );
+	my $gender = $abox-> insert( XButtons => name => 'gen', pack => { fill => "none", expand => 0, }, );
+	$gender->arrange("left"); # line up buttons horizontally (TODO: make this an option in the options hash? or depend on text length?)
+	my @presets = ("M","M","F","F");
+	my $current = ($user{gender} or "M"); # pull current value from config
+	$current = Common::findIn($current,@presets); # by finding it in the array
+	$current = ($current == -1 ? scalar @presets : $current/2); # and dividing its position by 2 (behavior is undefined if position is odd)
+	$gender-> build("",$current,@presets); # turn key:value pairs into exclusive buttons
 	$vbox->insert( Label => text => "Street Address" );
 	my $address = $vbox->insert( InputLine => maxLen => 253, text => ($user{address} or ''), pack => { fill => 'x', } );
 	my $cbox = $vbox->insert( HBox => name => 'citybox', pack => { expand => 1, }, );
@@ -634,15 +645,15 @@ sub editMemberDialog {
 			$user2{mphone} = $mphone->text if ($mphone->text ne '##########');
 			$user2{email} = $email->text if ($email->text ne (config('InDef','email') or 'user@example.com'));
 			$user2{dob} = $dob->text if ($dob->text ne '');
+			$user2{gender} = $gender->value;
 			$user2{address} = $address->text if ($address->text ne '');
 			$user2{city} = $city->text if ($city->text ne '' && $address->text ne '');
 			$user2{state} = $state->text if ($state->text ne '' && $address->text ne '');
 			$user2{zip} = $zip->text if ($zip->text ne '' && $address->text ne '');
-#			if (config('UI','splitmembers') {
-				$user2{memtype} = 0;
-				$user2{memtype} += 1 if $cbcast->checked;
-				$user2{memtype} += 2 if $cbcrew->checked;
-#			}
+#			# This is used for (config('UI','splitmembers').
+			$user2{memtype} = 0;
+			$user2{memtype} += 1 if $cbcast->checked;
+			$user2{memtype} += 2 if $cbcrew->checked;
 			$user2{imgfn} = $img->text if ($img->text ne 'noface.png');
 			$addbox->destroy();
 			unless ($isupdate) {
@@ -651,7 +662,7 @@ sub editMemberDialog {
 				$error = FlexSQL::doQuery(2,$dbh,$cmd,@parms);
 				unless ($error == 1) { sayBox($$gui{mainWin},"Adding user to database failed: $error"); return; }
 				$cmd = "SELECT givname, famname, mid FROM member WHERE famname=? AND givname=?;";
-				@parms = ($user{famname},$user{givname});
+				@parms = ($user2{famname},$user2{givname});
 				my $res = FlexSQL::doQuery(4,$dbh,$cmd,@parms);
 				unless (defined $res) {
 					Pdie("Error: Database access yielded undef!");
@@ -659,11 +670,12 @@ sub editMemberDialog {
 					foreach (@$res) {
 						my @a = @$_;
 						my $text = "$a[1], $a[0]"; # concatenate famname, givname and put a label in the window.
+						print "Adding button for $text...";
 						my $button = $target->insert( Button =>
 							text => $text,
 							alignment => ta::Left,
 							pack => { fill => 'x' },
-							onClick => sub { showRoleEditor($gui,$dbh,$a[2]); }# link button to role editor
+							onClick => sub { showRoleEditor($gui,$dbh,$a[2]); },# link button to role editor
 						);
 					}
 				}

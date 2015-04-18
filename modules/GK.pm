@@ -8,6 +8,13 @@ require Exporter;
 use Prima qw(Application Buttons MsgBox FrameSet);
 
 package XButtons; # Exclusive buttons group (radio checkboxes)
+# EXAMPLE:
+# my $gender = $parent-> insert( XButtons => name => 'gen' );
+# $gender->arrange("left"); # line up buttons horizontally (TODO: make this an option in the options hash? or depend on text length?)
+# my @presets = ("M","Male","F","Female");
+# my $current = 0;
+# $gender-> build("Sex:",$current,@presets); # turn key:value pairs into exclusive buttons
+# print $gender->value; # prints "M";
 use vars qw(@ISA);
 @ISA = qw(Prima::Widget);
 
@@ -15,12 +22,11 @@ my %profile = ( side => "top", );
 
 sub build {
 	my ($self,$text,$default,@opts) = @_;
-	$self{value} = $opts[$default*2];
-	$self->insert( Label => text => $text );
+	$self{value} = $opts[$default*2]; # x2 because $default is the position of the pair, not the item, in a paired array
+	$self->insert( Label => text => $text ) unless ($text eq "");
 	my %buttons = @opts;
 	foreach (keys %buttons) {
-		my $b = $self->insert( Button => checkable => 1, text => $buttons{$_}, name => $_ );
-		my $v = $_;
+		my $b = $self->insert( SpeedButton => checkable => 1, text => $buttons{$_}, name => $_, pack =>  { fill => "none", expand => 0, }, );
 		$b->checked(1) if ($_ eq $self{value});
 		$b->onClick( sub { $self->xClick($b); });
 	}
