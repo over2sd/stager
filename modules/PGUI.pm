@@ -356,7 +356,7 @@ sub showRoleEditor {
 		my $res = FlexSQL::doQuery(3,$dbh,$st,$mid,'rid');
 		foreach (keys %$res) { # list roles, with edit button for each role
 			my %row = %{ $$res{$_} };
-			showRole($dbh,$roletarget,$row{rid},$row{work},$row{troupe},$row{role},$row{year},$row{month});
+			showRole($dbh,$roletarget,$row{rid},$row{work},$row{troupe},$row{role},$row{year},$row{month},$row{mid},$row{rtype});
 		}
 		# place add role button
 		my $addbutton = $meminfo->insert( Button => text => "Add a role", );
@@ -378,35 +378,38 @@ sub labelBox {
 	my ($parent,$label,$name,$orientation,%args) = @_;
 	my $box;
 	unless (defined $orientation && $orientation =~ /[Hh]/) {
-		$box = $parent->insert( VBox => name => "$name", pack => { fill => ($args{boxfill} or 'none'), expand => ($args{boxex} or 1) }, );
+		$box = $parent->insert( VBox => name => "$name", alignment => ta::Left, );
+		$box->pack( fill => ($args{boxfill} or 'none'), expand => ($args{boxex} or 1), padx => ($args{margin} or 1), pady => ($args{margin} or 1), );
 	} else {
-		$box = $parent->insert( HBox => name => "$name", pack => { fill => ($args{boxfill} or 'none'), expand => ($args{boxex} or 1) }, );
+		$box = $parent->insert( HBox => name => "$name", alignment => ta::Left, );
+		$box->pack( fill => ($args{boxfill} or 'none'), expand => ($args{boxex} or 1), padx => ($args{margin} or 1), pady => ($args{margin} or 1), );
 	}
-	$box->insert( Label => text => "$label", pack => { fill => ($args{labfill} or 'x'), expand => ($args{labex} or 0), }  );
+	$box->insert( Label => text => "$label", valignment => ta::Middle, alignment => ta::Left, pack => { fill => ($args{labfill} or 'x'), expand => ($args{labex} or 0), }  );
 	return $box;
 }
 print ".";
 
 sub addRole {
-	my ($dbh, $mid, $target,$button) = @_;
+	my ($dbh, $mid, $target,$button,$existing) = @_;
 	$button->hide();
+#show => $sname, troupe => $tname, role => $role, year => $y, mon => $m, rtype => $rtype,
 	my $editbox = $target->insert( HBox => name => 'roleadd', pack => { fill => 'x', expand => 0, }, );
 	my $showbox = labelBox($editbox,"Production",'shobox','v',boxfill => 'x', boxex => 0, labex => 1);
 	my $shows = FlexSQL::getShowList($dbh);
 	my @showlist = values $shows;
-	my $work = $showbox->insert( ComboBox => style => cs::DropDown, items => \@showlist, text => '', height => 30 );
+	my $work = $showbox->insert( ComboBox => style => cs::DropDown, items => \@showlist, text => ($$existing{show} or ''), height => 30 );
 	my $rolebox = labelBox($editbox,"Role",'rolbox','v',boxfill => 'x', labex => 1);
-	my $role = $rolebox->insert( InputLine => text => '', pack => { fill => 'x' } );
+	my $role = $rolebox->insert( InputLine => text => ($$existing{role} or ''), pack => { fill => 'x' } );
 	my $ybox = labelBox($editbox,"Year",'ybox','v',labex => 1);
-	my $year = $ybox->insert( InputLine => text => '', width => 60, maxLen => 4 );
+	my $year = $ybox->insert( InputLine => text => ($$existing{year} or ''), width => 60, maxLen => 4 );
 	my $mbox = labelBox($editbox,"Month",'mbox','v',labex => 1);
-	my $month = $mbox->insert( InputLine => text => '', width => 30, maxLen => 2 );
+	my $month = $mbox->insert( InputLine => text => ($$existing{mon} or ''), width => 30, maxLen => 2 );
 	my $tbox = labelBox($editbox,"Troupe",'tbox','v', boxfill => 'x', labex => 1);
 	my $troupes = FlexSQL::getTroupeList($dbh);
 	my @troupelist = values $troupes;
-	my $troupe = $tbox->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => (config('InDef','troupe') or ''), height => 30 );
+	my $troupe = $tbox->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => ($$existing{troupe} or config('InDef','troupe') or ''), height => 30 );
 	my $crewbox = labelBox($editbox,"Crew",'cbox','v');
-	my $cbcrew = $crewbox->insert( SpeedButton => checkable => 1, checked => 0, );
+	my $cbcrew = $crewbox->insert( SpeedButton => checkable => 1, checked => ($$existing{rtype} & 2 ? 1 : 0), );
 	$cbcrew->onClick( sub { $cbcrew->text($cbcrew->checked ? "Y" : ""); } );
 	my $submitter = $editbox->insert( Button => text => "Submit");
 	$submitter->onClick( sub {
@@ -442,12 +445,12 @@ sub addRole {
 print ".";
 
 sub showRole {
-	my ($dbh,$target,$rid,$sid,$tid,$role,$y,$m) = @_;
+	my ($dbh,$target,$rid,$sid,$tid,$role,$y,$m,$mid,$rtype) = @_;
 	my $tname = FlexSQL::getTroupeByID($dbh,$tid);
 	my $sname = FlexSQL::getShowByID($dbh,$sid);
 	my $row = labelBox($target,"$sname: $role ($tname, $m/$y)",'rolerow','h', boxfill => 'x', labfill => 'none');
 	$row->backColor(convertColor(config('UI','rolebg') or "#99f"));
-	my $editbut = $row->insert( Button => text => "Edit role", onClick => sub { devHelp($target,"Editing of roles"); } );
+#	my $editbut = $row->insert( Button => text => "Edit role", onClick => sub { addRole($dbh, $mid, $target,$row,{ show => $sname, troupe => $tname, role => $role, year => $y, mon => $m, rtype => $rtype, }); } );
 	return 0;
 }
 print ".";
@@ -515,9 +518,8 @@ sub getOpts {
 	my %opts = (
 		'000' => ['l',"General",'Main'],
 		'001' => ['c',"Save window positions",'savepos'],
-##		'002' => ['x',"Foreground color: ",'fgcol',"#00000"],
-##		'003' => ['x',"Background color: ",'bgcol',"#CCCCCC"],
 		'004' => ['c',"Errors are fatal",'fatalerr'],
+		'002' => ['n',"Age of Majority",'guarage',18,10,35,1],
 
 		'005' => ['l',"Import/Export",'ImEx'],
 
@@ -532,8 +534,10 @@ sub getOpts {
 		'032' => ['c',"Show production tab",'showprodlist'],
 		'031' => ['s',"Notebook tab position: ",'tabson',1,"left","top","right","bottom"],
 		'033' => ['c',"Show member contact in role listing",'showcontact'],
-		'043' => ['x',"Background for role list",'rolebg',"#EEF"],
+		'043' => ['x',"Background for role list",'rolebg',"#99F"],
 		'034' => ['c',"Show members in multiple tabs (cast/crew/angels)",'splitmembers'],
+##		'042' => ['x',"Foreground color: ",'fgcol',"#00000"],
+##		'043' => ['x',"Background color: ",'bgcol',"#CCCCCC"],
 
 		'050' => ['l',"Fonts",'Font'],
 		'054' => ['f',"Tab font/size: ",'label'],
@@ -556,6 +560,7 @@ sub getOpts {
 		'075' => ['t',"Edit member save button",'okedit'],
 		'077' => ['t',"Add member save button",'okadd'],
 		'078' => ['t',"User details dialog title",'udetail'],
+		'079' => ['t'."Guardian dialog title",'guarinf'],
 
 		'ff0' => ['l',"Debug Options",'Debug'],
 		'ff1' => ['c',"Colored terminal output",'termcolors']
@@ -578,9 +583,11 @@ print ".";
 sub editMemberDialog {
 	my ($gui,$dbh,$buttontext,$isupdate,$target,%user) = @_;
 	my %user2;
+	my %guardian;
+	my $updateguar = 0;
 	my $addbox = Prima::Dialog->create(
 		borderStyle => bs::Sizeable,
-		size => [400,400],
+		size => [400,480],
 		text => (config('Custom','udetail') or "User Details"),
 		owner => $$gui{mainWin},
 		onTop => 1,
@@ -607,7 +614,26 @@ sub editMemberDialog {
 	my $abox = labelBox($vbox,"Birthdate (YYYYMMDD)",'abox','h',boxfill => 'x');
 # TODO: Add calendar button for date of birth? (if option selected?)
 	my $dob = $abox->insert( InputLine => maxLen => 10, width => 120, text => ($user{dob} or ''), );
-	my $gender = $abox-> insert( XButtons => name => 'gen', pack => { fill => "none", expand => 0, }, );
+	my $guarneed = ((Common::getAge($dob->text) or 0) < (config('Main','guarage') or "18"));
+	my $guarbuttext = ($guarneed ? "Guardian" : "Adult");
+	if ($isupdate) { # Pull guardian information from DB if this is an update
+		my $cmd = "SELECT * FROM guardian WHERE mid=?;";
+		my $res = (FlexSQL::doQuery(6,$dbh,$cmd,$user{mid}) or {}); # silent failure, and failure is graceful
+		%guardian = %$res;
+		$updateguar = (keys %guardian ? 1 : 0);
+	}
+	my $guartext = ($guarneed ? "Guardian: " . ($guardian{name} or 'unknown') . " " . ($guardian{phone} or '') : "---");
+	my $guarlabel;
+	my $guar = $abox->insert( Button => text => $guarbuttext, enabled => $guarneed, onClick => sub { %guardian = guardianDialog($$gui{mainWin}); $guarlabel->text("Guardian: " . ($guardian{name} or 'unknown') . " " . ($guardian{phone} or '')); $updateguar |= 2; }, );
+	$dob->onChange( sub {
+		return if (length($dob->text) < 8); # no point checking an incomplete date
+		$guarneed = ((Common::getAge($dob->text) or 0) < (config('Main','guarage') or "18"));
+		$guar->text($guarneed ? "Guardian" : "Adult");
+		$guar->enabled($guarneed);
+	}, );
+	$guarlabel = $vbox->insert( Label => text => $guartext, );
+	my $gbox = labelBox($vbox,"Gender",'gbox','h',boxfill => 'x');
+	my $gender = $gbox-> insert( XButtons => name => 'gen', pack => { fill => "none", expand => 0, }, );
 	$gender->arrange("left"); # line up buttons horizontally (TODO: make this an option in the options hash? or depend on text length?)
 	my @presets = ("M","M","F","F");
 	my $current = ($user{gender} or "M"); # pull current value from config
@@ -669,6 +695,10 @@ sub editMemberDialog {
 				} else {
 					foreach (@$res) {
 						my @a = @$_;
+						if ($guarneed and defined keys %guardian) { # insert guardian record, if applicable
+							$guardian{mid} = $a[2]; # member ID from result
+							storeGuardian($gui,$dbh,0,\%guardian);
+						}
 						my $text = "$a[1], $a[0]"; # concatenate famname, givname and put a label in the window.
 						print "Adding button for $text...";
 						my $button = $target->insert( Button =>
@@ -683,9 +713,22 @@ sub editMemberDialog {
 				foreach (keys %user2) {
 					delete $user2{$_} if ($user2{$_} eq $user{$_}); # remove unchanged/identical values from update queue.
 				}
-				unless (scalar keys %user2) { sayBox($$gui{mainWin},"Error: No changes made. If cancelling, click cancel."); return undef; } # no changes? return.
-				return undef unless (defined $user{mid}); #Have to know whom we're updating.
+				return unless (defined $user{mid}); #Have to know whom we're updating.
+				unless (scalar keys %user2) {
+					unless ($updateguar & 2) {
+						sayBox($$gui{mainWin},"Error: No changes made. If cancelling, click cancel.");
+					} else {
+						$guardian{mid} = $user{mid};
+						my $error = storeGuardian($gui,$dbh,($updateguar & 1),\%guardian);
+						sayBox($$gui{mainWin},"Guardian updated.") unless $error;
+					}
+					return;
+				} # no changes? return.
 				$user2{mid} = $user{mid}; # put ID key in hash we'll be using for prepare
+				if ($guarneed and defined keys %guardian) { # insert/update guardian record, if applicable
+					$guardian{mid} = $user{mid};
+					storeGuardian($gui,$dbh,($updateguar & 1),\%guardian);
+				}
 				my ($error,$cmd,@parms) = FlexSQL::prepareFromHash(\%user2,'member',1); # prepare update stateent
 				if ($error) { sayBox($$gui{mainWin},"Preparing user update statement failed: $error - $parms[0]"); return; }
 				$error = FlexSQL::doQuery(2,$dbh,$cmd,@parms); # run update statement on database, get back number of rows updated (should be 1)
@@ -695,6 +738,69 @@ sub editMemberDialog {
 		} # end OK button subroutine
 	); # End of button bar under details
 	$addbox->show(); # reveal our handiwork!!
+}
+print ".";
+
+sub guardianDialog {
+	my $parent = shift;
+	return askbox($parent,(config('Custom','guarinf') or "Guardian Info"),name=>"Guardian Name",phone=>"Guardian Phone #");
+}
+print ".";
+
+sub askbox { # makes a dialog asking for the answer(s) to a given list of questions, either a single scalar, or an array of key/question pairs whose answers will be stored in a hash with the given keys.
+	my ($parent,$tibar,@questions) = @_; # using an array allows single scalar question and preserved order of questions asked.
+	my $numq = int((scalar @questions / 2)+ 0.5);
+	print "Asking $numq questions...\n";
+	my $height = ($numq * 25) + 75;
+	my $askbox = Prima::Dialog->create(
+		centered => 1,
+		borderStyle => bs::Sizeable,
+		onTop => 1,
+		width => 400,
+		height => $height,
+		owner => $parent,
+		text => $tibar,
+		valignment => ta::Middle,
+		alignment => ta::Left,
+	);
+	my $extras = {};
+	my $buttons = mb::OkCancel;
+	my %answers;
+	my $vbox = $askbox->insert( VBox => autowidth => 1, pack => { fill => 'both', expand => 0, }, );
+	if (scalar @questions % 2) { # not a valid hash; assuming a single question
+		$numq = 0;
+		@questions = (one => $questions[0]); # discard all but the first element. Add a key for use by hash unpacker
+	}
+	my $i = 0;
+	until ($i > $#questions) {
+		my $row = labelBox($vbox,$questions[$i+1],"q$i",'h',boxfill=>'both', labfill => 'none', margin => 7, );
+		my $ans = $row->insert(InputLine => text => '', );
+		my $key = $questions[$i];
+		$ans->onChange( sub { $answers{$key} = $ans->text; } );
+		$i += 2;
+	}
+	my $spacer = $vbox->insert( Label => text => " ", pack => { fill => 'both', expand => 1 }, );
+	my $fresh = Prima::MsgBox::insert_buttons( $askbox, $buttons, $extras); # not reinventing wheel
+	$askbox->execute;
+	if ($numq == 0) {
+		return $answers{one};
+	} else {
+		return %answers;
+	}
+}
+print ".";
+
+sub storeGuardian {
+	my ($gui,$dbh,$isupdate,$g) = @_;
+	my ($error,$cmd,@parms) = FlexSQL::prepareFromHash($g,'guardian',$isupdate);
+	if ($error) {
+		sayBox($$gui{mainWin},"Preparing guardian " . ($isupdate ? "update" : "add") . " statement failed: $error - $parms[0]");
+		return 1;
+	} else {
+		$error = FlexSQL::doQuery(2,$dbh,$cmd,@parms);
+		unless ($error == 1) { sayBox($$gui{mainWin},($isupdate ? "Updating guardian information" : "Adding guardian to database") . " failed: $error"); return 2; }
+	}
+	return 0;
 }
 print ".";
 

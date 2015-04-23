@@ -196,7 +196,8 @@ sub prepareFromHash {
 	my ($href,$table,$update,$extra) = @_;
 	my %tablekeys = (
 		member => ['famname','givname','hphone','mphone','email','gender','address','city','state','zip','notes','dob','memtype','imgfn'],
-		cv => ['mid','show','role','year','month','troupe']
+		cv => ['mid','show','role','year','month','troupe'],
+		guardian => ['mid','name','phone','rel']
 	);
 	my ($upcolor,$incolor,$basecolor) = ("","","");
 	if ((FIO::config('Debug','termcolors') or 0)) {
@@ -205,11 +206,11 @@ sub prepareFromHash {
 		$incolor = Common::getColorsbyName("purple");
 		$basecolor = Common::getColorsbyName("base");
 	}
-	my %ids = ( member => "mid", cv => "rid");
+	my %ids = ( member => "mid", cv => "rid", guardian => 'mid');
 	my $idcol = $ids{$table} or return 1,"ERROR","Bad table name passed to prepareFromHash";
 	my %vals = %$href;
 	my @parms;
-	my $cmd = ($table eq "member" ? "member" : $table eq "cv" ? "cv" : "bogus");
+	my $cmd = ($table eq "member" ? "member" : $table eq "cv" ? "cv" : $table eq "guardian" ? "guardian" : "bogus");
 	if ($cmd eq "bogus") { return 1,"ERROR","Bogus table name passed to prepareFromHash"; }
 	my @keys = @{$tablekeys{$table}};
 	unless ($update) {
@@ -234,6 +235,7 @@ sub prepareFromHash {
 	} else {
 		$cmd = "UPDATE $cmd SET ";
 		print "$upcolor";
+		shift @keys if $table eq 'guardian'; # remove extraneous key for updating
 		foreach (keys %vals) {
 			unless (Common::findIn($_,@keys) < 0) {
 				$cmd = "$cmd$_=?, "; # columns

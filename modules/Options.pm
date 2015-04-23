@@ -79,6 +79,8 @@ sub addModOpts {
 			$checkit = (("$checkit" eq "1" or "$checkit" =~ /[Yy]/) ? 1 : 0);
 			$cb->checked($checkit);
 			$cb->onClick( sub { optChange($cb,[$change,$pos,$saveHash,$s,$key,$applyBut,(config($s,$key) or 0)]); } );
+		}elsif (/d/) { # Date row (with calendar button if option enabled)
+PGUI::devHelp($parent,"Date type options ($key)");
 		}elsif (/f/) {
 			my $row = $parent->insert( HBox => name => $lab );
 			my $f = FontRow->new( owner => $parent );
@@ -86,6 +88,9 @@ sub addModOpts {
 			$e->onChange( sub { optChange($e,[$change,$pos,$saveHash,$s,$key,$applyBut,(config($s,$key) or "")]); } );
 		}elsif (/m/) {
 PGUI::devHelp($parent,"Mask page options ($key)");
+		}elsif (/n/) {
+			my $col = (config($s,$key) or $col); # pull value from config, if present
+			buildNumericRow($parent,$saveHash,$applyBut,$lab,$s,$key,$col,$change,$pos,@a);
 		}elsif (/r/) {
 			my $col = (config($s,$key) or $col);
 			buildComboRow($parent,$saveHash,$applyBut,$lab,$s,$key,$col,$change,$pos,$_,@a);
@@ -136,6 +141,8 @@ sub optChange {
 		} elsif (/RadioButton/) {
 			($caller->get_active() ? $value = $rbval : return );
 		} elsif (/XButtons/) {
+			$value = $caller->value;
+		} elsif (/SpinEdit/ or /SpinButton/ or /AltSpinButton/) {
 			$value = $caller->value;
 		} else {
 			warn "Fail! '$_' (" . (defined $default ? $default : "undef") . ") unhandled";
@@ -218,6 +225,14 @@ sub buildComboRow {
 	} else {
 		warn "Incompatible selection type ($optyp)";
 	}
+}
+print ".";
+
+sub buildNumericRow {
+	my ($box,$options,$applyBut,$lab,$s,$key,$v,$changes,$pos,@boundaries) = @_;
+	my $row = PGUI::labelBox( $box,$lab,'numrow','h', boxex => 0, labex => 0);
+	my $n = $row->insert( SpinEdit => value => $v, min => ($boundaries[0] or 0), max => ($boundaries[1] or 10), step => ($boundaries[2] or 1), pageStep => ($boundaries[3] or 5));
+	$n->onChange( sub { optChange($n,[$changes,$pos,$options,$s,$key,$applyBut,config($s,$key)]); });
 }
 print ".";
 
