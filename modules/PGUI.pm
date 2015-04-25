@@ -58,7 +58,7 @@ sub createMainWin {
 	my ($version,$w,$h) = @_;
 	my $window = Prima::MainWindow->new(
 		text => (config('Custom','program') or "$PROGNAME") . " v.$version",
-		size => [($w or 640),($h or 480)],
+		size => [($w or 800),($h or 500)],
 	);
 	if (config('Main','savepos')) {
 		unless ($w and $h) { $w = config('Main','width'); $h = config('Main','height'); }
@@ -244,14 +244,13 @@ sub populateMainWin {
 	my ($dbh,$gui,$refresh) = @_;
 	$$gui{status}->push(($refresh ? "Reb" : "B") . "uilding UI...");
 # make a scrolled window
+	$$gui{mainvbox}->destroy if $refresh;
 	my @tabtexts;
 	my @tabs = qw[ mem rol ];
-	$tabs[0] = 'cas' if config('UI','splitmembers');
 	push(@tabs,'sho') if config('UI','showprodlist');
+	push(@tabs,'ang') if config('UI','showsupportlist');
 	foreach (@tabs) { # because tabs are controlled by option, tabnames must also be.
 		if (/mem/) { push(@tabtexts,(config('Custom',$_) or "Members")); }
-		elsif (/cas/) { push(@tabtexts,(config('Custom',$_) or "Cast")); }
-		elsif (/bsc/) { push(@tabtexts,(config('Custom',$_) or "Crew")); }
 		elsif (/rol/) { push(@tabtexts,(config('Custom',$_) or "Roles")); }
 		elsif (/sho/) { push(@tabtexts,(config('Custom',$_) or "Show")); }
 		elsif (/ang/) { push(@tabtexts,(config('Custom',$_) or "Angels")); }
@@ -270,10 +269,20 @@ sub populateMainWin {
 	$$gui{listpane} = $$gui{tabbar}->insert_to_page(0, VBox => name => "membox", pack => { fill => 'both' } );
 	my $buttonbar = $$gui{mainvbox}->insert( HBox => name => 'buttons', pack => { side => "left", fill => 'x', expand => 0, }, );
 	$$gui{tabbar}->owner($$gui{mainvbox});
-	my $target = $$gui{listpane}->insert( VBox => name => "Members", pack => { fill => 'both', expand => 1, }, );
+	$$gui{listpane}->insert( Label => text => "Cast", height => 40, valignment => ta::Middle, pack => { fill => 'both', expand => 1, padx => 15, }, ) if (config('UI','splitmembers'));
+	my $castbox = $$gui{listpane}->insert( HBox => name => "castall", pack => { fill => 'both', expand => 1, }, );
+	my $actortarget = $castbox->insert( VBox => name => "castm", pack => { fill => 'both', expand => 1, }, );
+	my $actresstarget = $castbox->insert( VBox => name => "castf", pack => { fill => 'both', expand => 1, }, );
+	my $crewtarget;
+	if (config('UI','splitmembers') or 0) {
+		$$gui{listpane}->insert( Label => text => "Crew", height => 40, valignment => ta::Middle, pack => { fill => 'both', expand => 1, padx => 15, }, );
+		$crewtarget = $$gui{listpane}->insert( HBox => name => "crewbox", pack => { fill => 'both', expand => 1, }, );
+		$crewtarget->insert( VBox => name => 'thingone', pack => { fill => 'both', expand => 1, }, );
+		$crewtarget->insert( VBox => name => 'thingtwo', pack => { fill => 'both', expand => 1, }, );
+	}
 	$buttonbar->insert( Button =>
 		text => "Add a member",
-		onClick => sub { addMember($gui,$dbh,$target); },
+		onClick => sub { addMember($gui,$dbh,$actortarget,$actresstarget,$crewtarget); },
 		pack => { side => "right", fill => 'x', expand => 0, },
 	);
 # Pull records from DB
@@ -283,16 +292,7 @@ sub populateMainWin {
 		Pdie("Error: Database access yielded undef!");
 	} else {
 		foreach (@$res) {
-			print ".";
-			my @a = @$_;
-			# TODO: use $a[2] (member ID) to count roles from roles table
-			my $text = "$a[1], $a[0]"; # concatenate famname, givname and put a label in the window.
-			my $button = $target->insert( Button =>
-				text => $text,
-				alignment => ta::Left,
-				pack => { fill => 'x' },
-				onClick => sub { showRoleEditor($gui,$dbh,$a[2]); }# link button to role editor
-				);
+			putButtons($_,$actortarget,$actresstarget,$crewtarget,$gui,$dbh);
 		}
 	}
 	$$gui{rolepage} = $$gui{tabbar}->insert_to_page(1, VBox => name => "role details", pack => { fill => 'both', expand => 1, side => 'left', });
@@ -370,8 +370,8 @@ sub showRoleEditor {
 print ".";
 
 sub addMember {
-	my ($gui,$dbh,$target) = @_;
-	editMemberDialog($gui,$dbh,(config('Custom','okadd') or "Add Member"),0,$target,());
+	my ($gui,$dbh,$mtarget,$ftarget,$ctarget) = @_;
+	editMemberDialog($gui,$dbh,(config('Custom','okadd') or "Add Member"),0,[$mtarget,$ftarget,$ctarget],());
 }
 print ".";
 
@@ -550,9 +550,10 @@ sub getOpts {
 		'031' => ['s',"Notebook tab position: ",'tabson',1,"left","top","right","bottom"],
 		'033' => ['c',"Show member contact in role listing",'showcontact'],
 		'043' => ['x',"Background for role list",'rolebg',"#99F"],
-		'034' => ['c',"Show members in multiple tabs (cast/crew/angels)",'splitmembers'],
+		'034' => ['c',"Show members in different places (cast/crew/angels)",'splitmembers'],
 ##		'042' => ['x',"Foreground color: ",'fgcol',"#00000"],
 ##		'043' => ['x',"Background color: ",'bgcol',"#CCCCCC"],
+		'035' => ['c',"Names on buttons as 'first last', not 'last, first'",'commalessname'],
 
 		'050' => ['l',"Fonts",'Font'],
 		'054' => ['f',"Tab font/size: ",'label'],
@@ -575,7 +576,7 @@ sub getOpts {
 		'075' => ['t',"Edit member save button",'okedit'],
 		'077' => ['t',"Add member save button",'okadd'],
 		'078' => ['t',"User details dialog title",'udetail'],
-		'079' => ['t'."Guardian dialog title",'guarinf'],
+		'079' => ['t',"Guardian dialog title",'guarinf'],
 
 		'ff0' => ['l',"Debug Options",'Debug'],
 		'ff1' => ['c',"Colored terminal output",'termcolors']
@@ -585,7 +586,11 @@ sub getOpts {
 print ".";
 
 sub refreshUI {
-	print "Refreshing UI...(does nothing yet)\n";
+	my ($gui,$dbh) = @_;
+	$gui = getGUI() unless (defined $$gui{status});
+	$dbh = FlexSQL::getDB() unless (defined $dbh);
+	print "Refreshing UI...\n";
+	populateMainWin($dbh,$gui,1);
 }
 print ".";
 
@@ -596,7 +601,7 @@ sub editMember {
 print ".";
 
 sub editMemberDialog {
-	my ($gui,$dbh,$buttontext,$isupdate,$target,%user) = @_;
+	my ($gui,$dbh,$buttontext,$isupdate,$targets,%user) = @_;
 	my %user2;
 	my %guardian;
 	my $updateguar = 0;
@@ -702,26 +707,18 @@ sub editMemberDialog {
 				if ($error) { sayBox($$gui{mainWin},"Preparing user add statement failed: $error - $parms[0]"); return; }
 				$error = FlexSQL::doQuery(2,$dbh,$cmd,@parms);
 				unless ($error == 1) { sayBox($$gui{mainWin},"Adding user to database failed: $error"); return; }
-				$cmd = "SELECT givname, famname, mid FROM member WHERE famname=? AND givname=?;";
+				$cmd = "SELECT givname, famname, mid, gender, memtype FROM member WHERE famname=? AND givname=?;";
 				@parms = ($user2{famname},$user2{givname});
 				my $res = FlexSQL::doQuery(4,$dbh,$cmd,@parms);
 				unless (defined $res) {
 					Pdie("Error: Database access yielded undef!");
 				} else {
 					foreach (@$res) {
-						my @a = @$_;
 						if ($guarneed and defined keys %guardian) { # insert guardian record, if applicable
-							$guardian{mid} = $a[2]; # member ID from result
+							$guardian{mid} = $$_[2]; # member ID from result
 							storeGuardian($gui,$dbh,0,\%guardian);
 						}
-						my $text = "$a[1], $a[0]"; # concatenate famname, givname and put a label in the window.
-						print "Adding button for $text...";
-						my $button = $target->insert( Button =>
-							text => $text,
-							alignment => ta::Left,
-							pack => { fill => 'x' },
-							onClick => sub { showRoleEditor($gui,$dbh,$a[2]); },# link button to role editor
-						);
+						putButtons($_,@$targets,$gui,$dbh);
 					}
 				}
 			} else {
@@ -816,6 +813,45 @@ sub storeGuardian {
 		unless ($error == 1) { sayBox($$gui{mainWin},($isupdate ? "Updating guardian information" : "Adding guardian to database") . " failed: $error"); return 2; }
 	}
 	return 0;
+}
+print ".";
+
+sub putButtons {
+	my ($ar,$mtar,$ftar,$ctar,$gui,$dbh) = @_;
+	my @a = @$ar;
+	my $target = (($a[3] =~ m/[Mm]/) ? $mtar : $ftar);
+	# TODO: use $a[2] (member ID) to count roles from roles table
+	my $text = (config('UI','commalessname') ? "$a[0] $a[1]" : "$a[1], $a[0]"); # concatenate famname, givname and put a label in the window.
+	if (config('UI','splitmembers')) {
+		if ($a[4] & 2) { #crew
+			my ($thingone, $thingtwo); # complicated rigamarole to make it alternate between columns when placing crew buttons
+			foreach ($ctar->get_widgets) {
+				$thingone = $_ if ($_->name eq 'thingone');
+				$thingtwo = $_ if ($_->name eq 'thingtwo');
+			}
+			$thingone = $ctar unless defined $thingone;
+			$thingtwo = $ctar unless defined $thingtwo;
+			my @b = $thingone->get_widgets;
+			my $c = scalar @b;
+			@b = $thingtwo->get_widgets;
+			my $d = scalar @b;
+			print "Count: $c/$d\n";
+			my $crewtarget = ($c > $d ? $thingtwo : $thingone);
+			my $button = $crewtarget->insert( Button =>
+				text => $text,
+				alignment => ta::Left,
+				pack => { fill => 'x' },
+				onClick => sub { showRoleEditor($gui,$dbh,$a[2]); }# link button to role editor
+				);
+		}
+		unless ($a[4] & 1) { return; }; # not actor
+	}
+	my $button = $target->insert( Button =>
+		text => $text,
+		alignment => ta::Left,
+		pack => { fill => 'x' },
+		onClick => sub { showRoleEditor($gui,$dbh,$a[2]); }# link button to role editor
+		);
 }
 print ".";
 

@@ -65,7 +65,7 @@ print ".";
 #####=> Migration marker
 sub addModOpts {
 	my ($parent,$s,$change,$pos,$applyBut,$saveHash,@a) = @_;
-	unless (scalar @a > 2) { print "array @a length: ". scalar @a . "."; return; } # malformed option, obviously
+	unless (scalar @a > 2) { print "\n[W] Option array too short: @a - length: ". scalar @a . "."; return; } # malformed option, obviously
 	my $item;
 	my $t = $a[0];
 	my $lab = $a[1];
@@ -116,7 +116,6 @@ print ".";
 
 sub mayApply {
 	my ($button,$maskref) = @_;
-print "?";
 	unless ($$maskref == 0) { $button->enabled(1); }
 }
 print ".";
@@ -131,7 +130,7 @@ sub optChange {
 	for (ref($caller)) {
 		if (/CheckBox/) {
 			$value = $caller->checked or 0;
-			$value = ($value ? 'y' : 'n');
+			$value = ($value ? 1 : 0);
 		} elsif (/InputLine/) {
 			$value = $caller->text;
 		} elsif (/ComboBox/) {
@@ -181,7 +180,7 @@ sub saveFromOpt {
 	$status->push("Options applied.");
 	$window->destroy();
 	# check here to see if something potentially crash-inducing has been changed, and shut down cleanly, instead, after informing user that a restart is required.
-	PGUI::refreshUI(); # refresh the UI
+	PGUI::refreshUI(PGUI::getGUI(),FlexSQL::getDB()); # refresh the UI
 }
 print ".";
 
