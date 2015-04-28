@@ -179,5 +179,20 @@ sub stripDOBdashes {
 }
 print ".";
 
+sub DoBrangefromAges {
+	my ($n,$x,$inclusive) = @_;
+	use DateTime;
+	return undef unless (defined $n and $n ne '');
+	$n = int($n);
+	$x = int($n) unless defined $x;
+	$x = int($x);
+	$inclusive = 0 unless defined $inclusive;
+	my ($xs,$ns) = (DateTime->now,DateTime->now);
+	$xs->subtract(years => $n, days => -$inclusive);
+	$ns->subtract(years => $x, days => 364 + $inclusive);
+	return $xs->ymd('-'),$ns->ymd('-');
+}
+print ".";
+
 print " OK; ";
 1;

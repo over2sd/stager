@@ -285,6 +285,20 @@ sub populateMainWin {
 		onClick => sub { addMember($gui,$dbh,$actortarget,$actresstarget,$crewtarget); },
 		pack => { side => "right", fill => 'x', expand => 0, },
 	);
+	my $agebox = $buttonbar->insert( HBox => backColor => convertColor("#969"), pack => { fill => 'both', expand => 0, ipadx => 7, ipady => 7, padx => 7 }, );
+	$agebox->insert( Label => text => '', name => 'spacer', pack => { fill => 'x', expand => 0, }, );
+	my $agebut = $agebox->insert( Button =>
+		text => "Cast by age",
+####### TODO: This is what I'm working on next!!! #######
+		pack => { side => "right", fill => 'x', expand => 0, },
+	);
+	my $minage = $agebox->insert( SpinEdit => value => 0, min => 0, max => 100, step => 1, pageStep => 5 );
+	my $maxage = $agebox->insert( SpinEdit => value => 99, min => 0, max => 100, step => 1, pageStep => 5 );
+	my $genage = $agebox->insert( XButtons => name => 'gender', pack => { fill => "none", expand => 0, }, );
+	$genage->arrange("left"); # line up buttons horizontally (TODO: make this an option in the options hash? or depend on text length?)
+	$genage->build('',0,('M','M','F','F'));
+	$agebut->onClick( sub { castByAge($gui,$dbh,$minage->value,$maxage->value,$genage->value); } );
+	$agebox->hide();
 # Pull records from DB
 	my $res = FlexSQL::getMembers($dbh,'all',());
 # foreach record:
@@ -292,7 +306,7 @@ sub populateMainWin {
 		Pdie("Error: Database access yielded undef!");
 	} else {
 		foreach (@$res) {
-			putButtons($_,$actortarget,$actresstarget,$crewtarget,$gui,$dbh);
+			putButtons($_,$actortarget,$actresstarget,$crewtarget,$gui,$dbh,0);
 		}
 	}
 	$$gui{rolepage} = $$gui{tabbar}->insert_to_page(1, VBox => name => "role details", pack => { fill => 'both', expand => 1, side => 'left', });
@@ -817,7 +831,7 @@ sub storeGuardian {
 print ".";
 
 sub putButtons {
-	my ($ar,$mtar,$ftar,$ctar,$gui,$dbh) = @_;
+	my ($ar,$mtar,$ftar,$ctar,$gui,$dbh,$imagebutton) = @_;
 	my @a = @$ar;
 	my $target = (($a[3] =~ m/[Mm]/) ? $mtar : $ftar);
 	# TODO: use $a[2] (member ID) to count roles from roles table
@@ -837,7 +851,7 @@ sub putButtons {
 			my $d = scalar @b;
 			print "Count: $c/$d\n";
 			my $crewtarget = ($c > $d ? $thingtwo : $thingone);
-			my $button = $crewtarget->insert( Button =>
+			$crewtarget->insert( Button =>
 				text => $text,
 				alignment => ta::Left,
 				pack => { fill => 'x' },
@@ -846,12 +860,24 @@ sub putButtons {
 		}
 		unless ($a[4] & 1) { return; }; # not actor
 	}
-	my $button = $target->insert( Button =>
+	$target->insert( Button =>
 		text => $text,
 		alignment => ta::Left,
 		pack => { fill => 'x' },
 		onClick => sub { showRoleEditor($gui,$dbh,$a[2]); }# link button to role editor
 		);
+}
+print ".";
+
+sub castByAge {
+	my ($gui,$dbh,$n,$x,$g) = @_;
+	print "I received $n-$x ($g)\n";
+	$g = ($g =~ m/[Mm]/ ? 'M' : 'F');
+	my $cmd = "SELECT mid,givname,famname FROM member WHERE gender=? AND dob<? AND dob>? ORDER BY dob;";
+	my ($maxdob,$mindob) = Common::DoBrangefromAges($n,$x,1);
+	my @parms = ($g,$maxdob,$mindob);
+	print "Parms: " . join(',',@parms) . "\n";
+
 }
 print ".";
 
