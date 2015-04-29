@@ -34,7 +34,7 @@ sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
 #			['~Synchronize', 'Ctrl-S', '^S', sub { message('synch!') }],
 			['~Preferences', sub { Options::mkOptBox($gui,getOpts()); }],
 			[],
-			['Close', 'Ctrl-W', km::Ctrl | ord('W'), sub { $$gui{mainWin}->close() } ],
+			['Close', 'Ctrl-W', km::Ctrl | ord('W'), sub { savePos($$gui{mainWin}) if (config('Main','savepos')); $$gui{mainWin}->close() } ],
 		]],
 		[ '~Help' => [
 			['~About', \&aboutBox],
@@ -296,8 +296,9 @@ sub populateMainWin {
 	my $maxage = $agebox->insert( SpinEdit => value => 99, min => 0, max => 100, step => 1, pageStep => 5 );
 	my $genage = $agebox->insert( XButtons => name => 'gender', pack => { fill => "none", expand => 0, }, );
 	$genage->arrange("left");
-	$genage->build('',0,('M','M','F','F'));
+	$genage->build('',1,('M','M','F','F'));
 	$agebut->onClick( sub { castByAge($gui,$dbh,$minage->value,$maxage->value,$genage->value); } );
+	$genage->onChange( sub { castByAge($gui,$dbh,$minage->value,$maxage->value,$genage->value); } );
 # Pull records from DB
 	my $res = FlexSQL::getMembers($dbh,'all',());
 # foreach record:
@@ -305,7 +306,9 @@ sub populateMainWin {
 		Pdie("Error: Database access yielded undef!");
 	} else {
 		foreach (@$res) {
-			putButtons($_,$actortarget,$actresstarget,$crewtarget,$gui,$dbh,0);
+			my $image = 0;
+			if (config('UI','headthumb')) { $image += 2; }
+			putButtons($_,$actortarget,$actresstarget,$crewtarget,$gui,$dbh,$image);
 		}
 	}
 	$$gui{facelist} = $$gui{tabbar}->insert_to_page(1, VBox => name => "cast faces", pack => { fill => 'both', expand => 1, side => 'left', });
@@ -551,7 +554,7 @@ sub getOpts {
 		'004' => ['c',"Errors are fatal",'fatalerr'],
 		'002' => ['n',"Age of Majority",'guarage',18,10,35,1],
 
-		'005' => ['l',"Import/Export",'ImEx'],
+#		'005' => ['l',"Import/Export",'ImEx'], # commented until it does something
 
 		'010' => ['l',"Database",'DB'],
 		'011' => ['r',"Database type:",'type',0,'M','MySQL','L','SQLite'],
@@ -566,9 +569,13 @@ sub getOpts {
 		'033' => ['c',"Show member contact in role listing",'showcontact'],
 		'043' => ['x',"Background for role list",'rolebg',"#99F"],
 		'034' => ['c',"Show members in different places (cast/crew/angels)",'splitmembers'],
+#		'035' => ['c',"Show supporter tab",'showsupportlist'],
 ##		'042' => ['x',"Foreground color: ",'fgcol',"#00000"],
 ##		'043' => ['x',"Background color: ",'bgcol',"#CCCCCC"],
-		'035' => ['c',"Names on buttons as 'first last', not 'last, first'",'commalessname'],
+		'036' => ['c',"Show thumbnails on buttons",'headthumb'],
+		'037' => ['n',"Scale factor of thumbnails",'thumbscale',0.25,0.1,0.95,0.05,0.25],
+		'038' => ['n',"Number of columns for face tab",'facecols',4,1,100,1,10],
+		'039' => ['c',"Names on buttons as 'first last', not 'last, first'",'commalessname'],
 
 		'050' => ['l',"Fonts",'Font'],
 		'054' => ['f',"Tab font/size: ",'label'],
@@ -587,14 +594,16 @@ sub getOpts {
 		'073' => ['t',"Role:",'rol'],
 		'071' => ['t',"Stager:",'program'],
 		'074' => ['t',"Show:",'sho'],
-		'076' => ['t',"Options dialog",'options'],
-		'075' => ['t',"Edit member save button",'okedit'],
-		'077' => ['t',"Add member save button",'okadd'],
-		'078' => ['t',"User details dialog title",'udetail'],
-		'079' => ['t',"Guardian dialog title",'guarinf'],
+		'075' => ['t',"Cast by Age:",'cba'],
+#		'076' => ['t',"Supporters:",'ang'],
+		'084' => ['t',"Options dialog",'options'],
+		'080' => ['t',"Edit member save button",'okedit'],
+		'081' => ['t',"Add member save button",'okadd'],
+		'082' => ['t',"User details dialog title",'udetail'],
+		'083' => ['t',"Guardian dialog title",'guarinf'],
 
 		'ff0' => ['l',"Debug Options",'Debug'],
-		'ff1' => ['c',"Colored terminal output",'termcolors']
+		'ff1' => ['c',"Colored terminal output",'termcolors'],
 	);
 	return %opts;
 }
@@ -836,7 +845,7 @@ sub putButtons {
 	my @a = @$ar;
 	my $target = (($a[3] =~ m/[Mm]/) ? $mtar : $ftar);
 	# TODO: use $a[2] (member ID) to count roles from roles table
-	my $text = (($imagebutton or config('UI','commalessname')) ? "$a[0] $a[1]" : "$a[1], $a[0]"); # concatenate famname, givname and put a label in the window.
+	my $text = (($imagebutton & 1 or config('UI','commalessname')) ? "$a[0] $a[1]" : "$a[1], $a[0]"); # concatenate famname, givname and put a label in the window.
 	if (config('UI','splitmembers')) {
 		if ($a[4] & 2) { #crew
 			my ($thingone, $thingtwo); # complicated rigamarole to make it alternate between columns when placing crew buttons
@@ -868,15 +877,17 @@ sub putButton {
 			$headshot->load("img/$src") or $headshot->load("img/noface.png") or sayBox($$gui{rolepage},"Could not load head shot: $@");
 		} else {
 			$headshot->load("img/noface.png") or sayBox($$gui{rolepage},"Could not load head shot placeholder: $@");
-		}		
-		# TODO: Make image a bitwise value, declaring options: vertical, thumbnail resizing, etc.
-		# if ($image & 2) { $headshot->size( [20,20] ); } # for example
-		$target->insert( Button => text => $label,
+		}
+		my $button = $target->insert( Button => text => $label,
 			onClick => sub { showRoleEditor($gui,$dbh,$id); }, # link button to role editor
+			alignment => ta::Left,
 			image => $headshot,
-			flat => 1,
-			vertical => 1,
+			flat => $image & 4,
+			vertical => $image & 1,
 		);
+		$button->pack( fill => 'x' );
+		$button->pack( expand => 1 ) if $image & 1;
+		if ($image & 2) { $button->imageScale( (config('UI','thumbscale') or 0.25) ); }
 	} else{
 		$target->insert( Button =>
 			text => $label,
@@ -916,7 +927,7 @@ sub castByAge {
 				$column++; $r++;
 				$row = $vbox->insert( HBox => name => "row$r", pack => { fill => 'x', expand => 0, }, );
 			}
-			putButtons($_,$row,$row,$row,$gui,$dbh,1);
+			putButtons($_,$row,$row,$row,$gui,$dbh,5);
 			$column++;
 			if ($column > (config('UI','facecols') or 4)) {
 				$column = 0; # reset column, triggering new row creation.
@@ -924,6 +935,25 @@ sub castByAge {
 		}
 	}
 	$$gui{tabbar}->pageIndex(1);
+}
+print ".";
+
+sub savePos {
+	my $o = shift;
+	return unless (defined $o);
+	my ($w,$h,$l,$t) = ($o->size,$o->origin);
+	unless (defined $w && defined $h && defined $t && defined $l) {
+		my $errtext = "[E] savePos was not passed a valid object!";
+		die $errtext if config('Main','fatalerr');
+		print $errtext;
+		return 1;
+	}
+	config('Main','width',$w);
+	config('Main','height',$h);
+	config('Main','top',$t);
+	config('Main','left',$l);
+	FIO::saveConf();
+	return 0;
 }
 print ".";
 

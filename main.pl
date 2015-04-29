@@ -5,7 +5,7 @@ use warnings;
 use utf8;
 
 use Getopt::Long;
-my $version = "0.0.17prealpha";
+my $version = "0.1.00alpha";
 my $conffilename = 'config.ini';
 my $showhelp = 0;
 $|++;
@@ -20,9 +20,6 @@ if ($showhelp) {
 	exit(0);
 }
 use lib "./modules/";
-
-# print "Loading modules...";
-
 use FIO qw( loadConf );
 
 FIO::loadConf($conffilename);
@@ -30,9 +27,6 @@ use FlexSQL;
 use PGUI;
 print "\nStarting GUI...\n";
 my $gui = PGUI::createMainWin($version);
-
-
-
 my $dbh = PGUI::loadDBwithSplashDetail($gui);
 PGUI::populateMainWin($dbh,$gui);
 
