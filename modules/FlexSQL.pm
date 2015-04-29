@@ -255,7 +255,7 @@ print ".";
 
 sub getMembers {
 	my ($dbh,$mtype,%exargs) = @_;
-	my $st = "SELECT givname, famname, mid, gender, memtype FROM member ORDER BY famname, givname;";
+	my $st = "SELECT givname, famname, mid, gender, memtype, imgfn FROM member ORDER BY famname, givname;";
 	my $res = doQuery(4,$dbh,$st);
 	return $res;
 }

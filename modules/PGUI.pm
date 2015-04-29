@@ -246,7 +246,7 @@ sub populateMainWin {
 # make a scrolled window
 	$$gui{mainvbox}->destroy if $refresh;
 	my @tabtexts;
-	my @tabs = qw[ mem rol ];
+	my @tabs = qw[ mem cba rol ];
 	push(@tabs,'sho') if config('UI','showprodlist');
 	push(@tabs,'ang') if config('UI','showsupportlist');
 	foreach (@tabs) { # because tabs are controlled by option, tabnames must also be.
@@ -254,6 +254,7 @@ sub populateMainWin {
 		elsif (/rol/) { push(@tabtexts,(config('Custom',$_) or "Roles")); }
 		elsif (/sho/) { push(@tabtexts,(config('Custom',$_) or "Show")); }
 		elsif (/ang/) { push(@tabtexts,(config('Custom',$_) or "Angels")); }
+		elsif (/cba/) { push(@tabtexts,(config('Custom',$_) or "Faces")); }
 	}
 	$$gui{tablist} = \@tabs;
 	my %args;
@@ -289,16 +290,14 @@ sub populateMainWin {
 	$agebox->insert( Label => text => '', name => 'spacer', pack => { fill => 'x', expand => 0, }, );
 	my $agebut = $agebox->insert( Button =>
 		text => "Cast by age",
-####### TODO: This is what I'm working on next!!! #######
 		pack => { side => "right", fill => 'x', expand => 0, },
 	);
 	my $minage = $agebox->insert( SpinEdit => value => 0, min => 0, max => 100, step => 1, pageStep => 5 );
 	my $maxage = $agebox->insert( SpinEdit => value => 99, min => 0, max => 100, step => 1, pageStep => 5 );
 	my $genage = $agebox->insert( XButtons => name => 'gender', pack => { fill => "none", expand => 0, }, );
-	$genage->arrange("left"); # line up buttons horizontally (TODO: make this an option in the options hash? or depend on text length?)
+	$genage->arrange("left");
 	$genage->build('',0,('M','M','F','F'));
 	$agebut->onClick( sub { castByAge($gui,$dbh,$minage->value,$maxage->value,$genage->value); } );
-	$agebox->hide();
 # Pull records from DB
 	my $res = FlexSQL::getMembers($dbh,'all',());
 # foreach record:
@@ -309,11 +308,13 @@ sub populateMainWin {
 			putButtons($_,$actortarget,$actresstarget,$crewtarget,$gui,$dbh,0);
 		}
 	}
-	$$gui{rolepage} = $$gui{tabbar}->insert_to_page(1, VBox => name => "role details", pack => { fill => 'both', expand => 1, side => 'left', });
+	$$gui{facelist} = $$gui{tabbar}->insert_to_page(1, VBox => name => "cast faces", pack => { fill => 'both', expand => 1, side => 'left', });
+	$$gui{facelist}->insert( Label => text => "Select age range and gender above to fill this tab.", height => 60, pack => { fill => 'both', } );
+	$$gui{rolepage} = $$gui{tabbar}->insert_to_page(2, VBox => name => "role details", pack => { fill => 'both', expand => 1, side => 'left', });
 	my $memtext = (config("Custom",'mem') or "Members");
 	$$gui{rolepage}->insert( Label => text => "Click on a member name on the $memtext page to fill this tab.", height => 60, pack => { fill => 'both', } );
 	if (config('UI','showprodlist')) {
-		$$gui{prodpage} = $$gui{tabbar}->insert_to_page(2, VBox => name => "show cast list", pack => { fill => 'both', expand => 1, side => 'left', });
+		$$gui{prodpage} = $$gui{tabbar}->insert_to_page(3, VBox => name => "show cast list", pack => { fill => 'both', expand => 1, side => 'left', });
 		my $selshowrow = labelBox($$gui{prodpage},"Select show and troupe:",'selbox','h', boxfill => 'x', boxex => 0,);
 		my $shows = FlexSQL::getShowList($dbh);
 		my @showlist = values $shows;
@@ -339,7 +340,7 @@ sub showRoleEditor {
 	my ($gui,$dbh,$mid) = @_;
 	$$gui{rolepage}->empty();
 	my $loading = $$gui{rolepage}->insert( Label => text => "The info for ID #$mid is now loading..." );
-	$$gui{tabbar}->pageIndex(1);
+	$$gui{tabbar}->pageIndex(2);
 	my $res = FlexSQL::getMemberByID($dbh,$mid); #get info for given mid
 	my %row = %$res;
 	if (keys %row) {
@@ -835,7 +836,7 @@ sub putButtons {
 	my @a = @$ar;
 	my $target = (($a[3] =~ m/[Mm]/) ? $mtar : $ftar);
 	# TODO: use $a[2] (member ID) to count roles from roles table
-	my $text = (config('UI','commalessname') ? "$a[0] $a[1]" : "$a[1], $a[0]"); # concatenate famname, givname and put a label in the window.
+	my $text = (($imagebutton or config('UI','commalessname')) ? "$a[0] $a[1]" : "$a[1], $a[0]"); # concatenate famname, givname and put a label in the window.
 	if (config('UI','splitmembers')) {
 		if ($a[4] & 2) { #crew
 			my ($thingone, $thingtwo); # complicated rigamarole to make it alternate between columns when placing crew buttons
@@ -851,33 +852,78 @@ sub putButtons {
 			my $d = scalar @b;
 			print "Count: $c/$d\n";
 			my $crewtarget = ($c > $d ? $thingtwo : $thingone);
-			$crewtarget->insert( Button =>
-				text => $text,
-				alignment => ta::Left,
-				pack => { fill => 'x' },
-				onClick => sub { showRoleEditor($gui,$dbh,$a[2]); }# link button to role editor
-				);
+			putButton($gui,$dbh,$a[2],$text,$crewtarget,$imagebutton,$a[5]);
 		}
 		unless ($a[4] & 1) { return; }; # not actor
 	}
-	$target->insert( Button =>
-		text => $text,
-		alignment => ta::Left,
-		pack => { fill => 'x' },
-		onClick => sub { showRoleEditor($gui,$dbh,$a[2]); }# link button to role editor
+	putButton($gui,$dbh,$a[2],$text,$target,$imagebutton,$a[5]);
+}
+print ".";
+
+sub putButton {
+	my ($gui,$dbh,$id,$label,$target,$image,$src) = @_;
+	if ($image) {
+		my $headshot = Prima::Image->new( size => [100,100]);
+		if (defined $src) {
+			$headshot->load("img/$src") or $headshot->load("img/noface.png") or sayBox($$gui{rolepage},"Could not load head shot: $@");
+		} else {
+			$headshot->load("img/noface.png") or sayBox($$gui{rolepage},"Could not load head shot placeholder: $@");
+		}		
+		# TODO: Make image a bitwise value, declaring options: vertical, thumbnail resizing, etc.
+		# if ($image & 2) { $headshot->size( [20,20] ); } # for example
+		$target->insert( Button => text => $label,
+			onClick => sub { showRoleEditor($gui,$dbh,$id); }, # link button to role editor
+			image => $headshot,
+			flat => 1,
+			vertical => 1,
 		);
+	} else{
+		$target->insert( Button =>
+			text => $label,
+			alignment => ta::Left,
+			pack => { fill => 'x' },
+			onClick => sub { showRoleEditor($gui,$dbh,$id); }# link button to role editor
+		);
+	}
 }
 print ".";
 
 sub castByAge {
 	my ($gui,$dbh,$n,$x,$g) = @_;
-	print "I received $n-$x ($g)\n";
+#	print "I received $n-$x ($g)\n";
 	$g = ($g =~ m/[Mm]/ ? 'M' : 'F');
-	my $cmd = "SELECT mid,givname,famname FROM member WHERE gender=? AND dob<? AND dob>? ORDER BY dob;";
+	# including all columns for compatibility with putButtons
+	my $cmd = "SELECT givname,famname,mid,gender,memtype,imgfn FROM member WHERE memtype & 1 AND gender=? AND (dob IS NULL OR dob<? AND dob>?) ORDER BY dob;";
 	my ($maxdob,$mindob) = Common::DoBrangefromAges($n,$x,1);
 	my @parms = ($g,$maxdob,$mindob);
-	print "Parms: " . join(',',@parms) . "\n";
-
+#	print "Parms: " . join(',',@parms) . "\n";
+	my $res = FlexSQL::doQuery(4,$dbh,$cmd,@parms);
+	unless (defined $res) {
+		Pdie("Error: Database access yielded undef!");
+	} else {
+		my $vbox = $$gui{facelist};
+		foreach ($vbox->get_widgets) {
+			$_->destroy();
+		}
+		my $row;
+		my $r = 0;
+		my $column = 0;
+		unless (@$res) {
+			$vbox->insert( Label => text => "No results. Try a new range.", height => 60, pack => { fill => 'both', } );
+		}
+		foreach (@$res) {
+			if ($column == 0) {
+				$column++; $r++;
+				$row = $vbox->insert( HBox => name => "row$r", pack => { fill => 'x', expand => 0, }, );
+			}
+			putButtons($_,$row,$row,$row,$gui,$dbh,1);
+			$column++;
+			if ($column > (config('UI','facecols') or 4)) {
+				$column = 0; # reset column, triggering new row creation.
+			}
+		}
+	}
+	$$gui{tabbar}->pageIndex(1);
 }
 print ".";
 
