@@ -14,6 +14,11 @@ use GK qw( VBox Table );
 use FIO qw( config );
 use Options;
 
+=item Pdie()
+Causes program to die by closing the main window.
+If a MESSAGE is passed to the function, it will be displayed in a
+message box before dying.
+=cut
 sub Pdie {
 	my $message = shift;
 	my $w = getGUI('mainWin');
@@ -26,6 +31,11 @@ sub Pwait {
 	# Placeholder for if I ever figure out how to do a non-blocking sleep function in Prima
 }
 
+=item buildMenus
+This function creates the menu structure for the dropdown menubar at
+the top of the program. Pretty standard stuff.
+Returns a reference to the array describing the menus.
+=cut
 sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
 	my $gui = shift;
 	my $menus = [
@@ -34,7 +44,7 @@ sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
 #			['~Synchronize', 'Ctrl-S', '^S', sub { message('synch!') }],
 			['~Preferences', sub { Options::mkOptBox($gui,getOpts()); }],
 			[],
-			['Close', 'Ctrl-W', km::Ctrl | ord('W'), sub { savePos($$gui{mainWin}) if (config('Main','savepos')); $$gui{mainWin}->close() } ],
+			['Close', 'Ctrl-W', km::Ctrl | ord('W'), sub { my $err = savePos($$gui{mainWin}) if (config('Main','savepos')); Common::errorOut('PGUI::savePos',$err) if $err; $$gui{mainWin}->close() } ],
 		]],
 		[ '~Help' => [
 			['~About', \&aboutBox],
@@ -44,6 +54,15 @@ sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
 }
 print ".";
 
+=item convertColor COLOR FORCE
+Takes a COLOR as either an integer value recognized by Prima or a hex
+string as #nnn or #nnnnnn.
+If FORCE is 1, the program will send the value to the converter even if
+it is only numerals (useful for sendiung 0x999  as '999' (without the #)
+This is useful for calling from an input box, which we don't expect the
+user to be putting valid Prima integers into.
+Returns an INTEGER.
+=cut
 sub convertColor {
 	my ($color,$force) = @_;
 	return undef unless (defined $color); # undef if no color given
@@ -52,8 +71,16 @@ sub convertColor {
 }
 print ".";
 
+=item createMainWin VERSION WIDTH HEIGHT
+Makes the main window and passes back a hashref to the window set
+(allowing easy access to the main window, the statusbar, etc.). The
+specified VERSION (required) goes in the titlebar. If a WIDTH and
+HEIGHT are specified, the window is resized to these values. However,
+if the configuration option to save window position is enabled, these
+values will be overridden by the stored size.
+Returns a HASREF.
+=cut
 my %windowset;
-
 sub createMainWin {
 	my ($version,$w,$h) = @_;
 	my $window = Prima::MainWindow->new(
@@ -74,10 +101,18 @@ sub createMainWin {
 }
 print ".";
 
+=item createSplash PARENT
+Makes a splash panel in PARENT for displaying load progress of database.
+On a fast machine, with database access information already configured,
+this may not even be noticeable before it is replaced with the actual
+GUI.
+Returns an OBJECT REFERENCE for the progress bar and an OBJECT
+REFERENCE for the splash box.
+=cut
 sub createSplash {
 	my $window = shift;
 	my $vb = $window->insert( VBox => name => "splashbox", pack => { anchor => "n", fill => 'x', expand => 0, relx => 0.5, rely => 0.5, padx => 5, pady => 5, }, );
-	my $label = $vb->insert( Label => text => "Loading $PROGNAME...", pack => { fill=> "x", expand => 0, side => "left", relx => 0.5, padx => 5, pady => 5,},);
+	my $label = $vb->insert( Label => text => "Loading " . (config('Custom','program') or "$PROGNAME") . "...", pack => { fill=> "x", expand => 0, side => "left", relx => 0.5, padx => 5, pady => 5,},);
 	my $progress = $vb->insert( Gauge =>
 		value => 0,	
 		relief => gr::Raise,
@@ -88,6 +123,12 @@ sub createSplash {
 }
 print ".";
 
+=item GetGUI KEY
+Gets (or creates if not present) the GUI, or returns a distinct part of
+the GUI, such as the stausbar or the main window.
+Returns a HASHREF, an OBJECT REFERENCE if a valid KEY was supplied, or
+UNDEF if an invalid KEY was supplied.
+=cut
 sub getGUI {
 	unless (defined keys %windowset) { createMainWin(); }
 	my $key = shift;
@@ -102,6 +143,10 @@ sub getGUI {
 }
 print ".";
 
+=item getStatus PARENT
+Places a statusbar in PARENT window, or returns the existing statusbar.
+Returns an OBJECT REFERENCE to the statustbar.
+=cut
 my $status = undef;
 sub getStatus {
 	my $win = shift;
@@ -113,6 +158,10 @@ sub getStatus {
 }
 print ".";
 
+=item getTabByCode CODE
+Attempts to find the tab page labeled CODE and return its page ID.
+Returns an INTEGER, or UNDEF.
+=cut
 sub getTabByCode { # for definitively finding page ID of tabs...
 	my $code = shift;
 	my $tabs = (getGUI("tablist") or []);
@@ -120,6 +169,14 @@ sub getTabByCode { # for definitively finding page ID of tabs...
 }
 print ".";
 
+=item loadDBwithSplashDetail GUI
+Loads the database, asking for required information, if it is not
+configured.
+On a fast machine, with database access information already configured,
+this may not even be noticeable before it is replaced with the actual
+GUI.
+Returns a DATABSE HANDLE.
+=cut
 sub loadDBwithSplashDetail {
 	my $gui = shift;
 	my ($prog,$box) = createSplash($$gui{mainWin});
@@ -240,6 +297,11 @@ sub loadDBwithSplashDetail {
 }
 print ".";
 
+=item populateMainWin HANDLE GUI REFRESH
+Fills or refreshes the main program window, depending on the value of
+REFRESH.
+No return value.
+=cut
 sub populateMainWin {
 	my ($dbh,$gui,$refresh) = @_;
 	$$gui{status}->push(($refresh ? "Reb" : "B") . "uilding UI...");
@@ -338,6 +400,7 @@ sub sayBox {
 	message($text,owner=>$parent);
 }
 print ".";
+
 
 sub showRoleEditor {
 	my ($gui,$dbh,$mid) = @_;
@@ -826,6 +889,13 @@ sub askbox { # makes a dialog asking for the answer(s) to a given list of questi
 }
 print ".";
 
+Common::registerErrors('PGUI::storeGuardian','[E] Statement preparation failed.','[E] Statement execution faile.');
+=item storeGuardian GUI HANDLE UPDATE HASHREF
+Given a HASHREF containing information about the guardian, stores or 
+updates the guardian's information in the database.
+Registers error codes.
+Returns 0 on success.
+=cut
 sub storeGuardian {
 	my ($gui,$dbh,$isupdate,$g) = @_;
 	my ($error,$cmd,@parms) = FlexSQL::prepareFromHash($g,'guardian',$isupdate);
@@ -938,14 +1008,18 @@ sub castByAge {
 }
 print ".";
 
+Common::registerErrors('PGUI::savePos',"[E] savePos was not passed a valid object!","[W] savePos requires an object to measure.");
+=item savePos WINDOW
+Given a WINDOW (or other oject with a size and origin), saves its
+position and size in the configuration file.
+Registers error codes.
+Returns 0 on success.
+=cut
 sub savePos {
 	my $o = shift;
-	return unless (defined $o);
+	return 2 unless (defined $o);
 	my ($w,$h,$l,$t) = ($o->size,$o->origin);
 	unless (defined $w && defined $h && defined $t && defined $l) {
-		my $errtext = "[E] savePos was not passed a valid object!";
-		die $errtext if config('Main','fatalerr');
-		print $errtext;
 		return 1;
 	}
 	config('Main','width',$w);

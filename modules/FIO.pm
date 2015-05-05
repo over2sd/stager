@@ -73,6 +73,7 @@ sub gz_decom {
 		or gzfail($GunzipError);
 	return 1;
 }
+# TODO: Check this function more thoroughly to see if it does what is expected.
 print ".";
 
 sub getFileName {

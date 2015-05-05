@@ -190,7 +190,74 @@ sub DoBrangefromAges {
 	my ($xs,$ns) = (DateTime->now,DateTime->now);
 	$xs->subtract(years => $n, days => -$inclusive);
 	$ns->subtract(years => $x, days => 364 + $inclusive);
-	return $xs->ymd('-'),$ns->ymd('-');
+	return $xs->ymd('-'),$ns->ymd('-'); # DoB should be < 1 and > 2
+}
+print ".";
+
+my %errorcodelist;
+sub registerErrors {
+	my ($func,@errors) = @_;
+	$errorcodelist{$func} = ["[I] 0",@errors];
+	if (1) {
+		print "- Registering error codes for $func:\n";
+		foreach (0 .. $#errors) {
+			print "\t" . $_ + 1 . ": $errors[$_]\n";
+		}
+	}
+use Data::Dumper;
+print Dumper %errorcodelist;
+}
+print ".";
+
+sub errorOut {
+	my ($func,$code,$fatal,$color) = @_;
+	unless (defined $func and defined $code) {
+		warn "errorOur called without required parameters";
+		return 1;
+	}
+	unless (defined $fatal and defined $color) {
+		use FIO qw( config ); # TODO: Fail gracefully here (eval?)
+		$fatal = ( FIO::config('Main','fatalerr') or 0 ) unless defined $fatal;
+		$color = ( FIO::config('Debug','termcolors') or 1 ) unless defined $color;
+	}
+	my $error = "errorOut could not find error code $code associated with $func";
+	unless (defined $errorcodelist{$func}) {
+		warn $error;
+		return 2;
+	}
+	my @list = @{ $errorcodelist{$func} };
+	unless (int($code) < scalar @list) {
+		# TODO: Test for %d in final error code. If found, use it with generic error message.
+#		$code = $#list;
+		# } else {
+		warn $error;
+		return 2;
+		# }
+	}
+	# actually regirstered error codes:
+	$error = $list[int($code)];
+	if ($error =~ m/^\[E\]/) { # error
+		$color = ($color ? 1 : 0);
+		($fatal ? die errColor($error,$color) . " in $func\n" : warn errColor($error,$color) . " in $func\n");
+	} elsif ($error =~ m/^\[W\]/) { # warning
+		$color = ($color ? 3 : 0);
+		($fatal ? warn errColor($error,$color) . " in $func\n" : print errColor($error,$color) . " in $func\n");
+	} elsif ($error =~ m/^\[I\]/) { # information
+		$color = ($color ? 2 : 0);
+		print errColor($error,$color) . " in $func\n";
+	} else { # unformatted (malformed) error
+		print $error;
+	}
+}
+print ".";
+
+sub errColor {
+	my ($string,$color) = @_;
+	return $string unless $color; # send back uncolored
+	# TODO: check for numeric value and use getColorsbyName if not numeric
+	my ($col,$base) = (getColors($color),getColorsbyName('base'));
+	my $colstring = substr($string,0,1) . $col . substr($string,1,1) . $base . substr($string,2);
+	return $colstring;
 }
 print ".";
 
