@@ -9,10 +9,11 @@ print __PACKAGE__;
 my $cfg = Config::IniFiles->new();
 my $cfgread = 0;
 
+Common::registerErrors('FIO::config',"[W] Using empty configuration!");
 sub config {
 	my ($section,$key,$value) = @_;
 	unless (defined $value) {
-		unless ($cfgread) { warn "Using empty configuration!"; }
+		unless ($cfgread) { Common::errorOut('FIO::config',1,fatal => 0) ; }
 		if (defined $cfg->val($section,$key,undef)) {
 			return $cfg->val($section,$key);
 		} else {

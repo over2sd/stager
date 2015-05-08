@@ -13,6 +13,8 @@ my $DBHOST = 'localhost';
 
 # DB wrappers that call SQL(ite) functions, depending on which the user has chosen to use for a backend.
 my $dbh;
+Common::registerErrors('FlexSQL::getDB',"[E] Cannot connect: %s","[E] DBI error from connect: %s","[E] Bad/no DB type passed to getDB! (%s)");
+Common::registerZero('FlexSQL::getDB',"[I] Database connection established.");
 sub getDB {
 	if (defined $dbh) { return $dbh; }
 	my ($dbtype) = shift;
@@ -20,7 +22,7 @@ sub getDB {
 	unless (defined $dbtype) { $dbtype = FIO::config('DB','type'); } # try to save
 	use DBI;
 	if ($dbtype eq "L") { # for people without access to a SQL server
-		$dbh = DBI->connect( "dbi:SQLite:$DBNAME.dbl" ) || return undef,"Cannot connect: $DBI::errstr";
+		$dbh = DBI->connect( "dbi:SQLite:$DBNAME.dbl" ) || return undef,1,$DBI::errstr;
 #		$dbh->do("SET NAMES 'utf8mb4'");
 		print "SQLite DB connected.";
 	} elsif ($dbtype eq "M") {
@@ -32,23 +34,28 @@ sub getDB {
 		my $flags = { mysql_enable_utf8mb4 => 1 };
 		if ($password ne '') {
 			$dbh = DBI->connect("DBI:mysql:$base:$host",$username,$password,$flags) ||
-				return undef, qq{DBI error from connect: "$DBI::errstr"};
+				return undef,2,$DBI::errstr;
 		} else {
 			$dbh = DBI->connect("DBI:mysql:$base:$host",$username,undef,$flags) ||
-				return undef, qq{DBI error from connect: "$DBI::errstr"};
+				return undef,2,$DBI::errstr;
 		}
 		$dbh->do("SET NAMES 'UTF8MB4'");
 	} else { #bad/no DB type
-		return undef,"Bad/no DB type passed to getDB! (" . ($dbtype or "undef") . ")";
+		return undef,3,($dbtype or "undef");
 	}
 	return $dbh,"";
 }
 print ".";
 
+Common::registerZero('FlexSQL::closeDB',"[I] Database closed.");
+=item closeDB HANDLE
+Closes the database. If not given a HANDLE, gets the DB HANDLE from
+getDB using a flag preventing creating just for closing.
+=cut
 sub closeDB {
 	my $dbh = shift or getDB(0);
-	if (defined $dbh) { $dbh->disconnect; }
-	print "Database closed.";
+	if (defined $dbh) { $dbh->disconnect or die "[E] Disconnect from DB failed!\n"; }
+	Common::errorOut('FlexSQL::closeDB',0,fatal => 0);
 }
 print ".";
 

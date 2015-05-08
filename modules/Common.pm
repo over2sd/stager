@@ -32,6 +32,7 @@ print ".";
 sub get {
 	my ($hr,$key,$dv) = @_;
 	if ((not defined $hr) or (not defined $key) or (not defined $dv)) {
+		$hr = 'undef' unless defined $hr; $key = 'undef' unless defined $key; $dv = 'undef' unless defined $dv;
 		warn "Safe getter called without required parameter(s)! ($hr,$key,$dv)";
 		return undef;
 	}
@@ -179,72 +180,110 @@ sub stripDOBdashes {
 }
 print ".";
 
+=item DoBrangefromAges MINAGE MAXAGE
+Given a minimum age MINAGE and an optional maximum age MAXAGE, this
+function returns two strings in YYYY-MM-DD format, suitable for use in
+SQL queries, e.g., WHERE ?<dob AND dob<?, using the return values in
+order as parameters. If no MAXAGE is given, date range is for MINAGE
+only.
+=cut
 sub DoBrangefromAges {
-	my ($n,$x,$inclusive) = @_;
+	my ($agemin,$agemax,$inclusive) = @_;
 	use DateTime;
-	return undef unless (defined $n and $n ne '');
-	$n = int($n);
-	$x = int($n) unless defined $x;
-	$x = int($x);
-	$inclusive = 0 unless defined $inclusive;
-	my ($xs,$ns) = (DateTime->now,DateTime->now);
-	$xs->subtract(years => $n, days => -$inclusive);
-	$ns->subtract(years => $x, days => 364 + $inclusive);
-	return $xs->ymd('-'),$ns->ymd('-'); # DoB should be < 1 and > 2
+	die "[E] Minimum age omitted in DoBrangefromAges" unless (defined $agemin and $agemin ne '');
+	$agemin = int($agemin);
+	$agemax = int($agemin) unless defined $agemax;
+	$agemax = int($agemax);
+	$inclusive = ($inclusive ? $inclusive : 0);
+	my ($maxdob,$mindob) = (DateTime->now,DateTime->now);
+	$maxdob->subtract(years => $agemin);
+	$mindob->subtract(years => $agemax + 1);
+	return $mindob->ymd('-'),$maxdob->ymd('-');
 }
 print ".";
 
+=item registerErrors FUNCTION ARRAY
+Given an ARRAY of error texts and a FUNCTION name, stores error texts
+for later display on error.
+=cut
 my %errorcodelist;
 sub registerErrors {
 	my ($func,@errors) = @_;
-	$errorcodelist{$func} = ["[I] 0",@errors];
-	if (1) {
-		print "- Registering error codes for $func:\n";
-		foreach (0 .. $#errors) {
-			print "\t" . $_ + 1 . ": $errors[$_]\n";
-		}
+	$errorcodelist{$func} = ['',] unless defined $errorcodelist{$func}; # prepare if no codes on record.
+#	print "\n - Registering error codes for $func:"; # "\n";
+	my ($col,$base) = (getColors(5),getColorsbyName('base'));
+	foreach (0 .. $#errors) {
+#		printf(" %d",$_ + 1); # "\t" . $_ + 1 . ": $errors[$_]\n";
+		$errorcodelist{$func}[$_ + 1] = $errors[$_];
+		print "$col-$base";
 	}
-use Data::Dumper;
-print Dumper %errorcodelist;
+#	print "\n";
+}
+print ".";
+
+=item registerZero FUNCTION DISPLAY
+This function registers errorcode for result of 0. Useful for either
+success or failure code of 0 (e.g. 0 results).
+=cut
+sub registerZero {
+	my ($func,$text) = @_;
+	$errorcodelist{$func} = ['',] unless defined $errorcodelist{$func}; # prepare if no codes on record.
+	$errorcodelist{$func}[0] = $text;
+	my ($col,$base) = (getColors(6),getColorsbyName('base'));
+	print "$col+$base";
 }
 print ".";
 
 sub errorOut {
-	my ($func,$code,$fatal,$color) = @_;
+	my ($func,$code,%args) = @_;
+	my $str = ($args{string} or undef);
+	my $trace = ($args{trace} or 0);
 	unless (defined $func and defined $code) {
-		warn "errorOur called without required parameters";
+		warn "errorOut called without required parameters";
 		return 1;
 	}
-	unless (defined $fatal and defined $color) {
-		use FIO qw( config ); # TODO: Fail gracefully here (eval?)
-		$fatal = ( FIO::config('Main','fatalerr') or 0 ) unless defined $fatal;
-		$color = ( FIO::config('Debug','termcolors') or 1 ) unless defined $color;
-	}
-	my $error = "errorOut could not find error code $code associated with $func";
+#		use FIO qw( config ); # TODO: Fail gracefully here (eval?)
+	my $fatal = ( $args{fatal} or FIO::config('Main','fatalerr') or 0 );
+	my $color = ( $args{color} or FIO::config('Debug','termcolors') or 1 );
+	my $error = qq{errorOut could not find error code $code associated with $func};
 	unless (defined $errorcodelist{$func}) {
 		warn $error;
 		return 2;
 	}
 	my @list = @{ $errorcodelist{$func} };
 	unless (int($code) < scalar @list) {
-		# TODO: Test for %d in final error code. If found, use it with generic error message.
-#		$code = $#list;
-		# } else {
-		warn $error;
-		return 2;
-		# }
+		if ($list[$#list] =~ m/%d/) { # Test for %d in final error code.
+			$code = $#list; # If found, use it as generic error message.
+		} else {
+			warn $error;
+			return 2;
+		}
 	}
-	# actually regirstered error codes:
+	# actually registered error codes:
 	$error = $list[int($code)];
+	if ($trace) {
+		use Carp qw( croak );
+		my @loc = caller(0);
+		my $line = $loc[2];
+		@loc = caller(1);
+		my $file = $loc[1];
+		my $sub = $loc[3];
+		$error = qq{$error at line $line of $sub in $file.\n};
+	}
+	$error =~ s/%d/$code/; # replace %d with $code
+	if (defined $str) {
+		$str = $func if ($str eq '%self');
+		$error =~ s/%s/$str/; # replace %s with given string
+	}
 	if ($error =~ m/^\[E\]/) { # error
 		$color = ($color ? 1 : 0);
-		($fatal ? die errColor($error,$color) . " in $func\n" : warn errColor($error,$color) . " in $func\n");
+		($fatal ? die errColor($error,$color) : warn errColor($error,$color));
 	} elsif ($error =~ m/^\[W\]/) { # warning
 		$color = ($color ? 3 : 0);
-		($fatal ? warn errColor($error,$color) . " in $func\n" : print errColor($error,$color) . " in $func\n");
+		($fatal ? warn errColor($error,$color) : print errColor($error,$color));
 	} elsif ($error =~ m/^\[I\]/) { # information
 		$color = ($color ? 2 : 0);
-		print errColor($error,$color) . " in $func\n";
+		print errColor($error . "\n",$color);
 	} else { # unformatted (malformed) error
 		print $error;
 	}

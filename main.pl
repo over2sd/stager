@@ -20,6 +20,7 @@ if ($showhelp) {
 	exit(0);
 }
 use lib "./modules/";
+use Common;
 use FIO qw( loadConf );
 
 FIO::loadConf($conffilename);

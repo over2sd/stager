@@ -86,6 +86,7 @@ sub createMainWin {
 	my $window = Prima::MainWindow->new(
 		text => (config('Custom','program') or "$PROGNAME") . " v.$version",
 		size => [($w or 800),($h or 500)],
+		onClose => sub { FlexSQL::closeDB(); },
 	);
 	if (config('Main','savepos')) {
 		unless ($w and $h) { $w = config('Main','width'); $h = config('Main','height'); }
@@ -261,12 +262,14 @@ sub loadDBwithSplashDetail {
 	$curstep->text("Establish database connection.");
 	$text->push("Connecting to database...");
 	$prog->value(++$step/$steps*100);
-	my ($dbh,$error) = FlexSQL::getDB($base,$host,'stager',$passwd,$uname);
+	my ($dbh,$error,$errstr) = FlexSQL::getDB($base,$host,'stager',$passwd,$uname);
 	unless (defined $dbh) { # error handling
-		Pdie("ERROR: $error");
+		Common::errorOut('FlexSQL::getDB',$error,string => $errstr);
+		Pdie("ERROR: $errstr");
 		print "Exiting (no DB).\n";
 	} else {
 		$curstep->text("---");
+		Common::errorOut('FlexSQL::getDB',0);
 		$text->push("Connected.");
 	}
 	if ($error =~ m/Unknown database/) { # rudimentary detection of first run
@@ -889,7 +892,7 @@ sub askbox { # makes a dialog asking for the answer(s) to a given list of questi
 }
 print ".";
 
-Common::registerErrors('PGUI::storeGuardian','[E] Statement preparation failed.','[E] Statement execution faile.');
+Common::registerErrors('PGUI::storeGuardian','[E] Statement preparation failed.','[E] Statement execution failed.');
 =item storeGuardian GUI HANDLE UPDATE HASHREF
 Given a HASHREF containing information about the guardian, stores or 
 updates the guardian's information in the database.
@@ -974,8 +977,8 @@ sub castByAge {
 #	print "I received $n-$x ($g)\n";
 	$g = ($g =~ m/[Mm]/ ? 'M' : 'F');
 	# including all columns for compatibility with putButtons
-	my $cmd = "SELECT givname,famname,mid,gender,memtype,imgfn FROM member WHERE memtype & 1 AND gender=? AND (dob IS NULL OR dob<? AND dob>?) ORDER BY dob;";
-	my ($maxdob,$mindob) = Common::DoBrangefromAges($n,$x,1);
+	my $cmd = "SELECT givname,famname,mid,gender,memtype,imgfn FROM member WHERE memtype & 1 AND gender=? AND (dob IS NULL OR ?<dob AND dob<?) ORDER BY dob;";
+	my ($mindob,$maxdob) = Common::DoBrangefromAges($n,$x,1);
 	my @parms = ($g,$maxdob,$mindob);
 #	print "Parms: " . join(',',@parms) . "\n";
 	my $res = FlexSQL::doQuery(4,$dbh,$cmd,@parms);
