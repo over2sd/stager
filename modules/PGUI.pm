@@ -199,12 +199,15 @@ sub loadDBwithSplashDetail {
 			buttons => {
 					mb::Yes, {
 						text => "MySQL", hint => "Use if you have a MySQL database.",
+						font => applyFont('button'),
 					},
 					mb::No, {
 						text => "SQLite", hint => "Use if you can't use MySQL.",
+						font => applyFont('button'),
 					},
 					mb::Cancel, {
 						text => "Quit", hint => "Abort loading the program (until you set up your database?)",
+						font => applyFont('button'),
 					},
 			}
 		);
@@ -350,16 +353,20 @@ sub populateMainWin {
 		text => "Add a member",
 		onClick => sub { addMember($gui,$dbh,$actortarget,$actresstarget,$crewtarget); },
 		pack => { side => "right", fill => 'x', expand => 0, },
+		hint => "Click to add a new member to the database.",
+		font => applyFont('button'),
 	);
 	my $agebox = $buttonbar->insert( HBox => backColor => convertColor("#969"), pack => { fill => 'both', expand => 0, ipadx => 7, ipady => 7, padx => 7 }, );
 	$agebox->insert( Label => text => '', name => 'spacer', pack => { fill => 'x', expand => 0, }, );
 	my $agebut = $agebox->insert( Button =>
 		text => "Cast by age",
 		pack => { side => "right", fill => 'x', expand => 0, },
+		font => applyFont('button'),
+		hint => "Click to see a list of cast between the ages given at the right.",
 	);
-	my $minage = $agebox->insert( SpinEdit => value => 0, min => 0, max => 100, step => 1, pageStep => 5 );
-	my $maxage = $agebox->insert( SpinEdit => value => 99, min => 0, max => 100, step => 1, pageStep => 5 );
-	my $genage = $agebox->insert( XButtons => name => 'gender', pack => { fill => "none", expand => 0, }, );
+	my $minage = $agebox->insert( SpinEdit => value => 0, min => 0, max => 100, step => 1, pageStep => 5, hint => "Enter the youngest actor you would cast.", );
+	my $maxage = $agebox->insert( SpinEdit => value => 99, min => 0, max => 100, step => 1, pageStep => 5, hint => "Enter the oldest actor you would cast.", );
+	my $genage = $agebox->insert( XButtons => name => 'gender', pack => { fill => "none", expand => 0, }, hint => "Click the gender of the character to be cast.", font => applyFont('button'),);
 	$genage->arrange("left");
 	$genage->build('',1,('M','M','F','F'));
 	$agebut->onClick( sub { castByAge($gui,$dbh,$minage->value,$maxage->value,$genage->value); } );
@@ -391,7 +398,7 @@ sub populateMainWin {
 		my @troupelist = values $troupes;
 		my $troupe = $selshowrow->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => (config('InDef','troupe') or ''), height => 30 );
 		my $castlist = $$gui{prodpage}-> insert( VBox => name => 'castbox', pack => { fill => 'both', expand => 0, });
-		$selshowrow->insert( Button => text => "Show Cast/Crew", onClick => sub { my $sid = Common::revGet($work->text,undef,%$shows); my $tid = Common::revGet($troupe->text,undef,%$troupes); castShow($dbh,$castlist,$sid,$tid); } );
+		$selshowrow->insert( Button => text => "Show Cast/Crew", onClick => sub { my $sid = Common::revGet($work->text,undef,%$shows); my $tid = Common::revGet($troupe->text,undef,%$troupes); castShow($dbh,$castlist,$sid,$tid); }, font => applyFont('button'), );
 	}
 	$$gui{status}->push("Ready.");
 	print " Done.";
@@ -427,9 +434,8 @@ sub showRoleEditor {
 		my $nametxt = "Name: $row{givname} $row{famname} ( $row{gender} age " . ($age ? $age : "unknown") . ")";
 		my $meminfo = $$gui{rolepage}->insert( VBox => name => "memberinfo", pack => { fill => 'both', expand => 1 }, );
 		my $header = labelBox($meminfo,$nametxt,"Roles",'h', boxfill => 'x', boxex => 1);
-		$header->insert( Button => text => "Edit", onClick => sub { editMember($gui,$dbh,$res); } );
+		$header->insert( Button => text => "Edit", onClick => sub { editMember($gui,$dbh,$res); }, font => applyFont('button'), );
 		$header->insert(ImageViewer => image => $headshot);
-		# TODO: member edit button
 		if (config("UI","showcontact")) {
 			$meminfo->insert( Label => text => "E-mail: $row{email}" );
 			$meminfo->insert( Label => text => "Phone: $row{hphone} H $row{mphone} M" );
@@ -444,10 +450,10 @@ sub showRoleEditor {
 			showRole($dbh,$roletarget,$row{rid},$row{work},$row{troupe},$row{role},$row{year},$row{month},$row{mid},$row{rtype});
 		}
 		# place add role button
-		my $addbutton = $meminfo->insert( Button => text => "Add a role", );
+		my $addbutton = $meminfo->insert( Button => text => "Add a role", font => applyFont('button'), );
 		$addbutton->onClick( sub { editRole($dbh, $mid, $roletarget, $addbutton); } );
 	}
-	$$gui{rolepage}->insert( Button => text => "Return", onClick =>  sub { $$gui{tabbar}->pageIndex(0); } );
+	$$gui{rolepage}->insert( Button => text => "Return", onClick =>  sub { $$gui{tabbar}->pageIndex(0); }, font => applyFont('button'), );
 
 	$loading->destroy();
 }
@@ -494,9 +500,9 @@ sub editRole {
 	my @troupelist = values $troupes;
 	my $troupe = $tbox->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => ($$existing{troupe} or config('InDef','troupe') or $troupelist[0] or ''), height => 30 );
 	my $crewbox = labelBox($editbox,"Crew",'cbox','v');
-	my $cbcrew = $crewbox->insert( SpeedButton => checkable => 1, checked => (($$existing{rtype} or 1) & 2 ? 1 : 0), );
+	my $cbcrew = $crewbox->insert( SpeedButton => checkable => 1, checked => (($$existing{rtype} or 1) & 2 ? 1 : 0), font => applyFont('button'), );
 	$cbcrew->onClick( sub { $cbcrew->text($cbcrew->checked ? "Y" : ""); } );
-	my $submitter = $editbox->insert( Button => text => "Submit");
+	my $submitter = $editbox->insert( Button => text => "Submit", font => applyFont('button'), );
 	$submitter->onClick( sub {
 		if ($work->text eq '' or $troupe->text eq '' or $role->text eq '') { sayBox($editbox,"A required field is blank!"); return; }
 		my $sid = Common::revGet($work->text,undef,%$shows);
@@ -536,7 +542,7 @@ sub showRole {
 	my $sname = FlexSQL::getShowByID($dbh,$sid);
 	my $row = labelBox($target,"$sname: $role ($tname, $m/$y)",'rolerow','h', boxfill => 'x', labfill => 'none');
 	$row->backColor(convertColor(config('UI','rolebg') or "#99f"));
-	my $editbut = $row->insert( Button => text => "Edit role", onClick => sub { editRole($dbh, $mid, $target,$row,{ show => $sname, troupe => $tname, role => $role, year => $y, mon => $m, rtype => $rtype, rid => $rid, },1) } );
+	my $editbut = $row->insert( Button => text => "Edit role", onClick => sub { editRole($dbh, $mid, $target,$row,{ show => $sname, troupe => $tname, role => $role, year => $y, mon => $m, rtype => $rtype, rid => $rid, },1) }, font => applyFont('button'), );
 	return 0;
 }
 print ".";
@@ -594,7 +600,7 @@ sub castShow {
 		my $name = getMemNameByID($dbh,$mid);
 		my $row = labelBox($target,"$$_[1]: ",'row','h');
 		my $gui = getGUI();
-		$row->insert( Button => text => $name, onClick => sub { showRoleEditor($gui,$dbh,$mid); } );
+		$row->insert( Button => text => $name, onClick => sub { showRoleEditor($gui,$dbh,$mid); }, font => applyFont('button'), );
 	}
 }
 print ".";
@@ -642,11 +648,16 @@ sub getOpts {
 		'037' => ['n',"Scale factor of thumbnails",'thumbscale',0.25,0.1,0.95,0.05,0.25],
 		'038' => ['n',"Number of columns for face tab",'facecols',4,1,100,1,10],
 		'039' => ['c',"Names on buttons as 'first last', not 'last, first'",'commalessname'],
+#		'03a' => [],
+		'040' => ['x',"Tooltip background color: ",'hintback',"#CC9999"],
+		'041' => ['x',"Tooltip foreground color: ",'hintfore',"#000033"],
 
 		'050' => ['l',"Fonts",'Font'],
 		'054' => ['f',"Tab font/size: ",'label'],
 #		'051' => ['f',"General font/size: ",'body'],
 #		'053' => ['f',"Special font/size: ",'special'], # for lack of a better term
+		'055' => ['f',"Tooltip font/size: ",'hint'],
+		'056' => ['f',"Button font/size: ",'button'],
 
 		'060' => ['l',"Input Defaults",'InDef'],
 		'061' => ['t',"Troupe/Theatre:",'troupe'],
@@ -708,22 +719,24 @@ sub editMemberDialog {
 	$vbox->insert( Button =>
 		text => "Cancel",
 		onClick => sub { print "Cancelled"; $addbox->destroy(); return undef; },
+		hint => "Cancel $buttontext.",
+		font => applyFont('button'),
 	);
 	my $namebox = $vbox->insert( HBox => name => 'namebox', pack => { expand => 1, }, );
 	my $nbox1 = labelBox($namebox,"Given Name",'n1','v');
 	my $nbox2 = labelBox($namebox,"Family Name",'n2','v');
-	my $givname = $nbox1->insert( InputLine => maxLen => 23, text => ($user{givname} or ''), );
-	my $famname = $nbox2->insert( InputLine => maxLen => 28, text => ($user{famname} or ''), );
+	my $givname = $nbox1->insert( InputLine => maxLen => 23, text => ($user{givname} or ''), hint => "Enter the member's first (given) name.", );
+	my $famname = $nbox2->insert( InputLine => maxLen => 28, text => ($user{famname} or ''), hint => "Enter the member's last (family) name.", );
 	my $phonbox = $vbox->insert( HBox => name => 'phones', pack => { fill => 'x', expand => 1, }, );
 	my $hpbox = labelBox($phonbox,"Home Phone",'pb1','v');
-	my $hphone = $hpbox->insert( InputLine => maxLen => 10, width => 150, text => ($user{hphone} or '##########'), );
+	my $hphone = $hpbox->insert( InputLine => maxLen => 10, width => 150, text => ($user{hphone} or '##########'), hint => "Enter the member's home phone number.", );
 	my $mpbox = labelBox($phonbox,"Mobile/Work Phone",'pb2','v');
-	my $mphone = $mpbox->insert( InputLine => maxLen => 10, width => 150, text => ($user{mphone} or '##########'), );
+	my $mphone = $mpbox->insert( InputLine => maxLen => 10, width => 150, text => ($user{mphone} or '##########'), hint => "Enter the member's mobile or work phone number.", );
 	$vbox->insert( Label => text => "E-mail Address" );
-	my $email = $vbox->insert( InputLine => maxLen => 254, text => ($user{email} or config('InDef','email') or 'user@example.com'), pack => { fill => 'x', } );
-	my $abox = labelBox($vbox,"Birthdate (YYYYMMDD)",'abox','h',boxfill => 'x');
+	my $email = $vbox->insert( InputLine => maxLen => 254, text => ($user{email} or config('InDef','email') or 'user@example.com'), pack => { fill => 'x', }, hint => "Enter the member's electronic mail address.", );
+	my $abox = labelBox($vbox,"Birthdate",'abox','h',boxfill => 'x');
 # TODO: Add calendar button for date of birth? (if option selected?)
-	my $dob = $abox->insert( InputLine => maxLen => 10, width => 120, text => ($user{dob} or ''), );
+	my $dob = $abox->insert( InputLine => maxLen => 10, width => 120, text => ($user{dob} or ''), hint => "Enter the member's date of birth\nas YYYY-MM-DD (hyphens optional)", );
 	my $guarneed = ((Common::getAge($dob->text) or 0) < (config('Main','guarage') or "18"));
 	my $guarbuttext = ($guarneed ? "Guardian" : "Adult");
 	if ($isupdate) { # Pull guardian information from DB if this is an update
@@ -734,16 +747,16 @@ sub editMemberDialog {
 	}
 	my $guartext = ($guarneed ? "Guardian: " . ($guardian{name} or 'unknown') . " " . ($guardian{phone} or '') : "---");
 	my $guarlabel;
-	my $guar = $abox->insert( Button => text => $guarbuttext, enabled => $guarneed, onClick => sub { %guardian = guardianDialog($$gui{mainWin}); $guarlabel->text("Guardian: " . ($guardian{name} or 'unknown') . " " . ($guardian{phone} or '')); $updateguar |= 2; }, );
+	my $guar = $abox->insert( Button => text => $guarbuttext, enabled => $guarneed, onClick => sub { %guardian = guardianDialog($$gui{mainWin}); $guarlabel->text("Guardian: " . ($guardian{name} or 'unknown') . " " . ($guardian{phone} or '')); $updateguar |= 2; }, hint => "If the member is a minor,\nclick this button to set information\nabout the member's guardian.", font => applyFont('button'), );
 	$dob->onChange( sub {
 		return if (length($dob->text) < 8); # no point checking an incomplete date
 		$guarneed = ((Common::getAge($dob->text) or 0) < (config('Main','guarage') or "18"));
 		$guar->text($guarneed ? "Guardian" : "Adult");
 		$guar->enabled($guarneed);
 	}, );
-	$guarlabel = $vbox->insert( Label => text => $guartext, );
+	$guarlabel = $vbox->insert( Label => text => $guartext, hint => "If a guardian has been set, the name and phone number will appear here.\nClick the 'Guardian' button to set this field.", );
 	my $gbox = labelBox($vbox,"Gender",'gbox','h',boxfill => 'x');
-	my $gender = $gbox-> insert( XButtons => name => 'gen', pack => { fill => "none", expand => 0, }, );
+	my $gender = $gbox-> insert( XButtons => name => 'gen', pack => { fill => "none", expand => 0, }, hint => "Click a button to set the member's sex.", font => applyFont('button'), );
 	$gender->arrange("left"); # line up buttons horizontally (TODO: make this an option in the options hash? or depend on text length?)
 	my @presets = ("M","M","F","F");
 	my $current = ($user{gender} or "M"); # pull current value from config
@@ -751,22 +764,24 @@ sub editMemberDialog {
 	$current = ($current == -1 ? scalar @presets : $current/2); # and dividing its position by 2 (behavior is undefined if position is odd)
 	$gender-> build("",$current,@presets); # turn key:value pairs into exclusive buttons
 	$vbox->insert( Label => text => "Street Address" );
-	my $address = $vbox->insert( InputLine => maxLen => 253, text => ($user{address} or ''), pack => { fill => 'x', } );
+	my $address = $vbox->insert( InputLine => maxLen => 253, text => ($user{address} or ''), pack => { fill => 'x', }, hint => "Enter the member's street address.", );
 	my $cbox = $vbox->insert( HBox => name => 'citybox', pack => { expand => 1, }, );
 	my $cbox1 = labelBox($cbox,"City",'c1','v',boxfill => 'x', labfill => 'x');
 	my $cbox2 = labelBox($cbox,"State",'c2','v');
 	my $cbox3 = labelBox($cbox,"ZIP",'c3','v');
-	my $city = $cbox1->insert( InputLine => maxLen => 99, text => ($user{city} or config('InDef','city') or ''), pack => { fill => 'x', expand => 1} );
-	my $state = $cbox2->insert( InputLine => maxLen => 3, text => ($user{state} or config('InDef','state') or ''), width => 45, );
-	my $zip = $cbox3->insert( InputLine => maxLen => 10, text => ($user{zip} or config('InDef','ZIP') or ''), );
+	my $city = $cbox1->insert( InputLine => maxLen => 99, text => ($user{city} or config('InDef','city') or ''), pack => { fill => 'x', expand => 1}, hint => "Enter the member's city.", );
+	my $state = $cbox2->insert( InputLine => maxLen => 3, text => ($user{state} or config('InDef','state') or ''), width => 45, hint => "Enter the member's state or province.", );
+	my $zip = $cbox3->insert( InputLine => maxLen => 10, text => ($user{zip} or config('InDef','ZIP') or ''), hint => "Enter the member's ZIP or other postal code.", );
 	my $mtbox = labelBox($vbox,"Type:",'rb','h');
 	my $memtype = ($user{memtype} or 0);
-	my $cbcast = $mtbox->insert( CheckBox => text => "Cast", checked => ($memtype & 1) );
-	my $cbcrew = $mtbox->insert( CheckBox => text => "Crew", checked => ($memtype & 2) );
+	my $cbcast = $mtbox->insert( CheckBox => text => "Cast", checked => ($memtype & 1), hint => "Check this if the member is willing to act on stage.", );
+	my $cbcrew = $mtbox->insert( CheckBox => text => "Crew", checked => ($memtype & 2), hint => "Check this if the member is willing to work offstage.", );
 	my $imbox = labelBox($vbox,"Headshot filename",'im','h', boxex => 1, boxfill => 'x');
-	my $img = $imbox->insert( InputLine => maxLen => 256, text => ($user{imgfn} or 'noface.png'), pack => { fill => 'x', expand => 1, }, );
+	my $img = $imbox->insert( InputLine => maxLen => 256, text => ($user{imgfn} or 'noface.png'), pack => { fill => 'x', expand => 1, }, hint => "Enter the name of the file you (will) put in the img/ directory\nshowing the member's head and shoulders.\nLeave blank if no photo is available.", );
 	$vbox->insert( Button =>
 		text => $buttontext,
+		hint => "Click here to submit the form.",
+		font => applyFont('button'),
 		onClick => sub {
 			$addbox->hide();
 			# process information
@@ -883,6 +898,7 @@ sub askbox { # makes a dialog asking for the answer(s) to a given list of questi
 	}
 	my $spacer = $vbox->insert( Label => text => " ", pack => { fill => 'both', expand => 1 }, );
 	my $fresh = Prima::MsgBox::insert_buttons( $askbox, $buttons, $extras); # not reinventing wheel
+	$fresh->set( font => applyFont('button'), );
 	$askbox->execute;
 	if ($numq == 0) {
 		return $answers{one};
@@ -958,6 +974,7 @@ sub putButton {
 			flat => $image & 4,
 			vertical => $image & 1,
 		);
+		applyFont('button',$button);
 		$button->pack( fill => 'x' );
 		$button->pack( expand => 1 ) if $image & 1;
 		if ($image & 2) { $button->imageScale( (config('UI','thumbscale') or 0.25) ); }
@@ -966,6 +983,7 @@ sub putButton {
 			text => $label,
 			alignment => ta::Left,
 			pack => { fill => 'x' },
+			font => applyFont('button'),
 			onClick => sub { showRoleEditor($gui,$dbh,$id); }# link button to role editor
 		);
 	}
@@ -1031,6 +1049,21 @@ sub savePos {
 	config('Main','left',$l);
 	FIO::saveConf();
 	return 0;
+}
+print ".";
+
+=item applyFont STYLE WIDGET
+Attempts to get the font called STYLE from the configuration's Font
+section (as a name and size) and apply it as a Prima font to the given
+Prima WIDGET.
+If no WIDGET is given, returns the font profile. This is useful in
+object creation without a reference saved.
+=cut
+sub applyFont {
+	my ($key,$widget) = @_;
+	return undef unless (defined $key); # just silently fail if no key given.
+	unless (defined $widget) { return FontRow->stringToFont(FIO::config('Font',$key) or ""); } # return the font if no wifget given (for use in insert() profiles).
+	$widget->set( font => FontRow->stringToFont(FIO::config('Font',$key) or ""),); # apply the font; Yay!
 }
 print ".";
 

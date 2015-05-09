@@ -179,7 +179,8 @@ sub saveFromOpt {
 	FIO::saveConf();
 	$status->push("Options applied.");
 	$window->destroy();
-	# check here to see if something potentially crash-inducing has been changed, and shut down cleanly, instead, after informing user that a restart is required.
+	# TODO: check here to see if something potentially crash-inducing has been changed, and shut down cleanly, instead, after informing user that a restart is required.
+	formatTooltips(); # set tooltip format, in case it was changed.
 	PGUI::refreshUI(PGUI::getGUI(),FlexSQL::getDB()); # refresh the UI
 }
 print ".";
@@ -232,6 +233,21 @@ sub buildNumericRow {
 	my $row = PGUI::labelBox( $box,$lab,'numrow','h', boxex => 0, labex => 0);
 	my $n = $row->insert( SpinEdit => value => $v, min => ($boundaries[0] or 0), max => ($boundaries[1] or 10), step => ($boundaries[2] or 1), pageStep => ($boundaries[3] or 5));
 	$n->onChange( sub { optChange($n,[$changes,$pos,$options,$s,$key,$applyBut,config($s,$key)]); });
+}
+print ".";
+
+=item formatTooltips
+Formats (or reformats after options have been changed) the font,
+colors, and delay of the tooltips (hints) displayed by the program.
+Takes no arguments, as it gets its settings from config().
+=cut
+sub formatTooltips {
+	return $::application->set(
+		hintPause => 2500,
+		hintColor => PGUI::convertColor((FIO::config('UI','hintfore') or '#000')),
+		hintBackColor => PGUI::convertColor((FIO::config('UI','hintback') or '#CFF')),
+		hintFont => PGUI::applyFont('hint'),
+	);
 }
 print ".";
 

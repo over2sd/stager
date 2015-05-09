@@ -223,7 +223,7 @@ sub getFontString { # takes a reference to a Prima::Font
 sub stringToFont {
 	# TODO: Add an option that allows getting just the face, not the size (for options dialog)
 	#  ...or just the size, not the face. (for accessibility spinner)
-	my ($string) = @_;
+	my ($string) = pop @_; # so it work with or without the unneeded FontRow argument
 	if ($string =~ m/(.+) (\d+)/) { # use regex to grab name and size
 		my $newfont = {
 			name => $1,
@@ -231,7 +231,7 @@ sub stringToFont {
 		};
 		return $newfont;
 	} else {
-		warn "No matching string!\n";
+		if (0) { Common::errorOut('inline',0,string => "[I] An invalid or empty string was sent to stringToFont!"); }
 		return {};
 	}
 }

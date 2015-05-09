@@ -24,9 +24,11 @@ use Common;
 use FIO qw( loadConf );
 
 FIO::loadConf($conffilename);
+Options::formatTooltips();
 use FlexSQL;
 use PGUI;
-print "\nStarting GUI...\n";
+print "\n";
+Common::errorOut('inline',0,string => "[I] Starting GUI...");
 my $gui = PGUI::createMainWin($version);
 my $dbh = PGUI::loadDBwithSplashDetail($gui);
 PGUI::populateMainWin($dbh,$gui);

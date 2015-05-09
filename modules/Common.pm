@@ -246,11 +246,11 @@ sub errorOut {
 	my $fatal = ( $args{fatal} or FIO::config('Main','fatalerr') or 0 );
 	my $color = ( $args{color} or FIO::config('Debug','termcolors') or 1 );
 	my $error = qq{errorOut could not find error code $code associated with $func};
-	unless (defined $errorcodelist{$func}) {
+	unless (defined $errorcodelist{$func} or $func eq 'inline') {
 		warn $error;
 		return 2;
 	}
-	my @list = @{ $errorcodelist{$func} };
+	my @list = ($func eq 'inline' ? (($args{string} or "[E] Oops!")) : @{ $errorcodelist{$func} });
 	unless (int($code) < scalar @list) {
 		if ($list[$#list] =~ m/%d/) { # Test for %d in final error code.
 			$code = $#list; # If found, use it as generic error message.
