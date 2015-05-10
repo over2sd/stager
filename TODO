@@ -1,3 +1,4 @@
 Fix doQuery so that mode 3 returns an array of hashrefs instead of a hashref of hashref of hashref nonsense
 Normalize XButtons class with add/remove button methods and change name of build to buildfromhash
+Redo splash detail for DB load, if possible.
 

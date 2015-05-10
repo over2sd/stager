@@ -29,6 +29,18 @@ sub Pdie {
 
 sub Pwait {
 	# Placeholder for if I ever figure out how to do a non-blocking sleep function in Prima
+	my $duration = shift or 1;
+	my $start = time();
+	my $end = ($start+$duration);
+	while ($end > time()) {
+#		while (events_pending()) {
+			$::application->yield();
+#		}
+		# 10ms sleep.
+		# Not much, but prevents processor spin without making waiting dialogs unresponsive.
+		select(undef,undef,undef,0.01);
+	}
+	return 0;
 }
 
 =item buildMenus
@@ -237,14 +249,14 @@ sub loadDBwithSplashDetail {
 			$curstep->text("Enter database login info");
 			$text->push("Getting login credentials...");
 			$prog->value(++$step/$steps*100); # 0
-		# ask user for host
-			my $host = input_box("Server Info","Server address:","127.0.0.1");
 		# ask user if username required
 			my $umand = (message("Username required?",mb::YesNo) == mb::Yes ? 'y' : 'n');
-		# ask user for SQL username, if needed by server (might not be, for localhost)
-			my $uname = ($umand eq 'y' ? input_box("Login Credentials","Username (if required)","") : undef);
 		# ask user if password required
 			my $pmand = (message("Password required?",mb::YesNo) == mb::Yes ? 'y' : 'n');
+		# ask user for host
+			my $host = input_box("Server Info","Server address:","127.0.0.1");
+		# ask user for SQL username, if needed by server (might not be, for localhost)
+			my $uname = ($umand eq 'y' ? input_box("Login Credentials","Username (if required)","") : undef);
 			$curstep->text("---");
 			# save data from entry boxes...
 			$text->push("Saving server info...");
@@ -332,7 +344,7 @@ sub populateMainWin {
 		style => tns::Simple,
 		tabs => \@tabtexts,
 		name => 'Scroller',
-		tabsetProfile => {colored => 0, %args, },
+		tabsetProfile => {colored => 0, %args, font => applyFont('label'), },
 		pack => { fill => 'both', expand => 1, pady => 3, side => "left", },
 	);
 	$$gui{listpane} = $$gui{tabbar}->insert_to_page(0, VBox => name => "membox", pack => { fill => 'both' } );
@@ -344,7 +356,7 @@ sub populateMainWin {
 	my $actresstarget = $castbox->insert( VBox => name => "castf", pack => { fill => 'both', expand => 1, }, );
 	my $crewtarget;
 	if (config('UI','splitmembers') or 0) {
-		$$gui{listpane}->insert( Label => text => "Crew", height => 40, valignment => ta::Middle, pack => { fill => 'both', expand => 1, padx => 15, }, );
+		$$gui{listpane}->insert( Label => text => "Crew", height => 40, valignment => ta::Middle, pack => { fill => 'both', expand => 1, padx => 15, }, font => applyFont('body'), );
 		$crewtarget = $$gui{listpane}->insert( HBox => name => "crewbox", pack => { fill => 'both', expand => 1, }, );
 		$crewtarget->insert( VBox => name => 'thingone', pack => { fill => 'both', expand => 1, }, );
 		$crewtarget->insert( VBox => name => 'thingtwo', pack => { fill => 'both', expand => 1, }, );
@@ -383,13 +395,13 @@ sub populateMainWin {
 			putButtons($_,$actortarget,$actresstarget,$crewtarget,$gui,$dbh,$image);
 		}
 	}
-	$$gui{facelist} = $$gui{tabbar}->insert_to_page(1, VBox => name => "cast faces", pack => { fill => 'both', expand => 1, side => 'left', });
+	$$gui{facelist} = $$gui{tabbar}->insert_to_page(1, VBox => name => "cast faces", pack => { fill => 'both', expand => 1, side => 'left', font => applyFont('body'), });
 	$$gui{facelist}->insert( Label => text => "Select age range and gender above to fill this tab.", height => 60, pack => { fill => 'both', } );
-	$$gui{rolepage} = $$gui{tabbar}->insert_to_page(2, VBox => name => "role details", pack => { fill => 'both', expand => 1, side => 'left', });
+	$$gui{rolepage} = $$gui{tabbar}->insert_to_page(2, VBox => name => "role details", pack => { fill => 'both', expand => 1, side => 'left', font => applyFont('body'), });
 	my $memtext = (config("Custom",'mem') or "Members");
 	$$gui{rolepage}->insert( Label => text => "Click on a member name on the $memtext page to fill this tab.", height => 60, pack => { fill => 'both', } );
 	if (config('UI','showprodlist')) {
-		$$gui{prodpage} = $$gui{tabbar}->insert_to_page(3, VBox => name => "show cast list", pack => { fill => 'both', expand => 1, side => 'left', });
+		$$gui{prodpage} = $$gui{tabbar}->insert_to_page(3, VBox => name => "show cast list", pack => { fill => 'both', expand => 1, side => 'left', font => applyFont('body'), });
 		my $selshowrow = labelBox($$gui{prodpage},"Select show and troupe:",'selbox','h', boxfill => 'x', boxex => 0,);
 		my $shows = FlexSQL::getShowList($dbh);
 		my @showlist = values $shows;
@@ -405,17 +417,24 @@ sub populateMainWin {
 }
 print ".";
 
+=item sayBox PARENT TEXT
+Makes a dialog box with a message of TEXT and an owner of PARENT.
+GUI equivalent to 'print TEXT;'.
+=cut
 sub sayBox {
 	my ($parent,$text) = @_;
 	message($text,owner=>$parent);
 }
 print ".";
 
-
+=item showRoleEditor GUI HANDLE ID
+Puts a list of member #ID's roles in the rolepage object of GUI, pulling
+information using the given database HANDLE.
+=cut
 sub showRoleEditor {
 	my ($gui,$dbh,$mid) = @_;
 	$$gui{rolepage}->empty();
-	my $loading = $$gui{rolepage}->insert( Label => text => "The info for ID #$mid is now loading..." );
+ 	my $loading = $$gui{rolepage}->insert( Label => text => "The info for ID #$mid is now loading..." );
 	$$gui{tabbar}->pageIndex(2);
 	my $res = FlexSQL::getMemberByID($dbh,$mid); #get info for given mid
 	my %row = %$res;
@@ -434,7 +453,7 @@ sub showRoleEditor {
 		my $nametxt = "Name: $row{givname} $row{famname} ( $row{gender} age " . ($age ? $age : "unknown") . ")";
 		my $meminfo = $$gui{rolepage}->insert( VBox => name => "memberinfo", pack => { fill => 'both', expand => 1 }, );
 		my $header = labelBox($meminfo,$nametxt,"Roles",'h', boxfill => 'x', boxex => 1);
-		$header->insert( Button => text => "Edit", onClick => sub { editMember($gui,$dbh,$res); }, font => applyFont('button'), );
+		$header->insert( Button => text => "Edit", onClick => sub { editMember($gui,$dbh,$res); }, font => applyFont('button'), hint => "Click to edit member information.", );
 		$header->insert(ImageViewer => image => $headshot);
 		if (config("UI","showcontact")) {
 			$meminfo->insert( Label => text => "E-mail: $row{email}" );
@@ -450,10 +469,10 @@ sub showRoleEditor {
 			showRole($dbh,$roletarget,$row{rid},$row{work},$row{troupe},$row{role},$row{year},$row{month},$row{mid},$row{rtype});
 		}
 		# place add role button
-		my $addbutton = $meminfo->insert( Button => text => "Add a role", font => applyFont('button'), );
+		my $addbutton = $meminfo->insert( Button => text => "Add a role", font => applyFont('button'), hint => "Click to add a role to this member.", );
 		$addbutton->onClick( sub { editRole($dbh, $mid, $roletarget, $addbutton); } );
 	}
-	$$gui{rolepage}->insert( Button => text => "Return", onClick =>  sub { $$gui{tabbar}->pageIndex(0); }, font => applyFont('button'), );
+	$$gui{rolepage}->insert( Button => text => "Return", onClick =>  sub { $$gui{tabbar}->pageIndex(0); }, font => applyFont('button'), hint => "Click to return to the Members tab.", );
 
 	$loading->destroy();
 }
@@ -654,7 +673,7 @@ sub getOpts {
 
 		'050' => ['l',"Fonts",'Font'],
 		'054' => ['f',"Tab font/size: ",'label'],
-#		'051' => ['f',"General font/size: ",'body'],
+		'051' => ['f',"General font/size: ",'body'],
 #		'053' => ['f',"Special font/size: ",'special'], # for lack of a better term
 		'055' => ['f',"Tooltip font/size: ",'hint'],
 		'056' => ['f',"Button font/size: ",'button'],
@@ -747,7 +766,7 @@ sub editMemberDialog {
 	}
 	my $guartext = ($guarneed ? "Guardian: " . ($guardian{name} or 'unknown') . " " . ($guardian{phone} or '') : "---");
 	my $guarlabel;
-	my $guar = $abox->insert( Button => text => $guarbuttext, enabled => $guarneed, onClick => sub { %guardian = guardianDialog($$gui{mainWin}); $guarlabel->text("Guardian: " . ($guardian{name} or 'unknown') . " " . ($guardian{phone} or '')); $updateguar |= 2; }, hint => "If the member is a minor,\nclick this button to set information\nabout the member's guardian.", font => applyFont('button'), );
+	my $guar = $abox->insert( Button => text => $guarbuttext, enabled => $guarneed, onClick => sub { %guardian = guardianDialog($$gui{mainWin},($guarlabel->text or $guartext)); $guarlabel->text("Guardian: " . ($guardian{name} or 'unknown') . " " . ($guardian{phone} or '')); $updateguar |= 2; }, hint => "If the member is a minor,\nclick this button to set information\nabout the member's guardian.", font => applyFont('button'), );
 	$dob->onChange( sub {
 		return if (length($dob->text) < 8); # no point checking an incomplete date
 		$guarneed = ((Common::getAge($dob->text) or 0) < (config('Main','guarage') or "18"));
@@ -859,13 +878,17 @@ sub editMemberDialog {
 print ".";
 
 sub guardianDialog {
-	my $parent = shift;
-	return askbox($parent,(config('Custom','guarinf') or "Guardian Info"),name=>"Guardian Name",phone=>"Guardian Phone #");
+	my ($parent,$string) = @_;
+	$string =~ m/Guardian: (.+) ([0-9]{7,10})/;
+	my %defaults;
+	$defaults{name} = $1 if (defined $1);
+	$defaults{phone} = $2 if (defined $2);
+	return askbox($parent,(config('Custom','guarinf') or "Guardian Info"),\%defaults,name=>"Guardian Name",phone=>"Guardian Phone #");
 }
 print ".";
 
 sub askbox { # makes a dialog asking for the answer(s) to a given list of questions, either a single scalar, or an array of key/question pairs whose answers will be stored in a hash with the given keys.
-	my ($parent,$tibar,@questions) = @_; # using an array allows single scalar question and preserved order of questions asked.
+	my ($parent,$tibar,$defaults,@questions) = @_; # using an array allows single scalar question and preserved order of questions asked.
 	my $numq = int((scalar @questions / 2)+ 0.5);
 	print "Asking $numq questions...\n";
 	my $height = ($numq * 25) + 75;
@@ -893,6 +916,7 @@ sub askbox { # makes a dialog asking for the answer(s) to a given list of questi
 		my $row = labelBox($vbox,$questions[$i+1],"q$i",'h',boxfill=>'both', labfill => 'none', margin => 7, );
 		my $ans = $row->insert(InputLine => text => '', );
 		my $key = $questions[$i];
+		$ans->text($$defaults{$key}) if exists $$defaults{$key};
 		$ans->onChange( sub { $answers{$key} = $ans->text; } );
 		$i += 2;
 	}
@@ -1062,7 +1086,7 @@ object creation without a reference saved.
 sub applyFont {
 	my ($key,$widget) = @_;
 	return undef unless (defined $key); # just silently fail if no key given.
-	unless (defined $widget) { return FontRow->stringToFont(FIO::config('Font',$key) or ""); } # return the font if no wifget given (for use in insert() profiles).
+	unless (defined $widget) { return FontRow->stringToFont(FIO::config('Font',$key) or FIO::config('Font','body') or ""); } # return the font if no wifget given (for use in insert() profiles).
 	$widget->set( font => FontRow->stringToFont(FIO::config('Font',$key) or ""),); # apply the font; Yay!
 }
 print ".";
