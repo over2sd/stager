@@ -180,22 +180,21 @@ sub stripDOBdashes {
 }
 print ".";
 
-=item DoBrangefromAges MINAGE MAXAGE
-Given a minimum age MINAGE and an optional maximum age MAXAGE, this
-function returns two strings in YYYY-MM-DD format, suitable for use in
-SQL queries, e.g., WHERE ?<dob AND dob<?, using the return values in
-order as parameters. If no MAXAGE is given, date range is for MINAGE
-only.
+=item DoBrangefromAges REFERENCEDATE MINAGE MAXAGE
+Given a REFERENCEDATE from which to calculate, minimum age MINAGE, and
+an optional maximum age MAXAGE, this function returns two strings in
+YYYY-MM-DD format, suitable for use in SQL queries, e.g., 'WHERE ?<dob
+AND dob<?', using the return values in order as parameters. If no
+MAXAGE is given, date range is for the year spanning MINAGE only.
 =cut
 sub DoBrangefromAges {
-	my ($agemin,$agemax,$inclusive) = @_;
-	use DateTime;
+	my ($querydate,$agemin,$agemax,$inclusive) = @_;
 	die "[E] Minimum age omitted in DoBrangefromAges" unless (defined $agemin and $agemin ne '');
 	$agemin = int($agemin);
 	$agemax = int($agemin) unless defined $agemax;
 	$agemax = int($agemax);
 	$inclusive = ($inclusive ? $inclusive : 0);
-	my ($maxdob,$mindob) = (DateTime->now,DateTime->now);
+	my ($maxdob,$mindob) = ($querydate,$querydate);
 	$maxdob->subtract(years => $agemin);
 	$mindob->subtract(years => $agemax + 1);
 	return $mindob->ymd('-'),$maxdob->ymd('-');
@@ -275,13 +274,14 @@ sub errorOut {
 		$str = $func if ($str eq '%self');
 		$error =~ s/%s/$str/; # replace %s with given string
 	}
-	if ($error =~ m/^\[E\]/) { # error
+	my $nl = ($error =~ m/^\n/ ? 1 : 0); # allow string to begin with newline
+	if ($error =~ m/^\n?\[E\]/) { # error
 		$color = ($color ? 1 : 0);
 		($fatal ? die errColor($error,$color) : warn errColor($error,$color));
-	} elsif ($error =~ m/^\[W\]/) { # warning
+	} elsif ($error =~ m/^\n?\[W\]/) { # warning
 		$color = ($color ? 3 : 0);
 		($fatal ? warn errColor($error,$color) : print errColor($error,$color));
-	} elsif ($error =~ m/^\[I\]/) { # information
+	} elsif ($error =~ m/^\n?\[I\]/) { # information
 		$color = ($color ? 2 : 0);
 		print errColor($error . "\n",$color);
 	} else { # unformatted (malformed) error
@@ -291,11 +291,11 @@ sub errorOut {
 print ".";
 
 sub errColor {
-	my ($string,$color) = @_;
+	my ($string,$color,$nl) = @_;
 	return $string unless $color; # send back uncolored
 	# TODO: check for numeric value and use getColorsbyName if not numeric
 	my ($col,$base) = (getColors($color),getColorsbyName('base'));
-	my $colstring = substr($string,0,1) . $col . substr($string,1,1) . $base . substr($string,2);
+	my $colstring = substr($string,0 + $nl,1) . $col . substr($string,1 + $nl,1) . $base . substr($string,2 + $nl);
 	return $colstring;
 }
 print ".";

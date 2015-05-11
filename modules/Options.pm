@@ -81,6 +81,7 @@ sub addModOpts {
 			$cb->onClick( sub { optChange($cb,[$change,$pos,$saveHash,$s,$key,$applyBut,(config($s,$key) or 0)]); } );
 		}elsif (/d/) { # Date row (with calendar button if option enabled)
 PGUI::devHelp($parent,"Date type options ($key)");
+
 		}elsif (/f/) {
 			my $f = FontRow->new( owner => $parent );
 			my $e = $f->build($lab,{ font => (config($s,$key) or "") },{ text => "Select", });

@@ -8,12 +8,13 @@ print __PACKAGE__;
 
 my $cfg = Config::IniFiles->new();
 my $cfgread = 0;
+my $emptywarned = 0;
 
-Common::registerErrors('FIO::config',"[W] Using empty configuration!");
+Common::registerErrors('FIO::config',"\n[W] Using empty configuration!");
 sub config {
 	my ($section,$key,$value) = @_;
 	unless (defined $value) {
-		unless ($cfgread) { Common::errorOut('FIO::config',1,fatal => 0) ; }
+		unless ($cfgread or $emptywarned) { $emptywarned++; Common::errorOut('FIO::config',1,fatal => 0, ); }
 		if (defined $cfg->val($section,$key,undef)) {
 			return $cfg->val($section,$key);
 		} else {
@@ -31,7 +32,7 @@ print ".";
 
 sub validateConfig { # sets config values for missing required defaults
 	my %defaults = (
-		"width" => 375,
+		"width" => 480,
 		"height" => 480,
 		"savepos" => 0
 		);

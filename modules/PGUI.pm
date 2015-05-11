@@ -188,7 +188,7 @@ configured.
 On a fast machine, with database access information already configured,
 this may not even be noticeable before it is replaced with the actual
 GUI.
-Returns a DATABSE HANDLE.
+Returns a DATABASE HANDLE.
 =cut
 sub loadDBwithSplashDetail {
 	my $gui = shift;
@@ -420,6 +420,7 @@ print ".";
 =item sayBox PARENT TEXT
 Makes a dialog box with a message of TEXT and an owner of PARENT.
 GUI equivalent to 'print TEXT;'.
+No return value.
 =cut
 sub sayBox {
 	my ($parent,$text) = @_;
@@ -430,6 +431,7 @@ print ".";
 =item showRoleEditor GUI HANDLE ID
 Puts a list of member #ID's roles in the rolepage object of GUI, pulling
 information using the given database HANDLE.
+No return value.
 =cut
 sub showRoleEditor {
 	my ($gui,$dbh,$mid) = @_;
@@ -478,14 +480,33 @@ sub showRoleEditor {
 }
 print ".";
 
+=item addMember
+Displays a dialog for adding a member.
+No return value.
+=cut
 sub addMember {
 	my ($gui,$dbh,$mtarget,$ftarget,$ctarget) = @_;
 	editMemberDialog($gui,$dbh,(config('Custom','okadd') or "Add Member"),0,[$mtarget,$ftarget,$ctarget],());
 }
 print ".";
 
+=item labelBox CONTAINER TEXT NAME ORIENTATION HASH
+This function builds a vertical or horizontal box (depending on the
+value of ORIENTATION; defaults to 'V' if missing or malformed) named
+NAME and containing a label that says TEXT inside CONTAINER.
+
+These additional arguments may be passed in the optional HASH:
+* boxfill - How will the new box fill its parent? (pack=>fill values)
+* boxex - Will the new box expand (pack=>expand values)
+* margin - Padding around the new box
+* labfill - How will the label fill the new box? (pack=>fill values)
+* labex - Will the label expand (pack=>expand values)
+
+Returns a VBox or HBox named NAME.
+=cut
 sub labelBox {
 	my ($parent,$label,$name,$orientation,%args) = @_;
+	die "[E] Missing parameter to labelBox" unless (defined $parent and defined $label and defined $name);
 	my $box;
 	unless (defined $orientation && $orientation =~ /[Hh]/) {
 		$box = $parent->insert( VBox => name => "$name", alignment => ta::Left, );
@@ -499,6 +520,21 @@ sub labelBox {
 }
 print ".";
 
+=item editRole HANDLE MEMBER CONTAINER BUTTON ROLE DISPOSABLE
+Displays a row in CONTAINER allowing the user to edit the role
+information of member #MEMBER using database handle HANDLE to retrieve
+and update information. BUTTON is hidden during this process.
+
+If this is an existing role being edited, BUTTON might actually be an
+HBox created by a previous call to editRole(), in which case the user
+passes information about the role in a hashref ROLE and may indicate
+that BUTTON is DISPOSABLE, so editRole() will destroy it after editing.
+
+Once the user presses the Submit button, editRole() will attempt to
+store the new information using a call to storeRole(), which will also
+place a row with the updated information in the CONTAINER.
+No return value.
+=cut
 sub editRole {
 	my ($dbh, $mid, $target,$button,$existing,$killbutton) = @_;
 	$button->hide();
@@ -507,27 +543,27 @@ sub editRole {
 	my $showbox = labelBox($editbox,"Production",'shobox','v',boxfill => 'x', boxex => 0, labex => 1);
 	my $shows = FlexSQL::getShowList($dbh);
 	my @showlist = values $shows;
-	my $work = $showbox->insert( ComboBox => style => cs::DropDown, items => \@showlist, text => ($$existing{show} or ''), height => 30 );
+	my $work = $showbox->insert( ComboBox => style => cs::DropDown, items => \@showlist, text => ($$existing{show} or ''), height => 30, hint => "The name of the production", );
 	my $rolebox = labelBox($editbox,"Role",'rolbox','v',boxfill => 'x', labex => 1);
-	my $role = $rolebox->insert( InputLine => text => ($$existing{role} or ''), pack => { fill => 'x' } );
+	my $role = $rolebox->insert( InputLine => text => ($$existing{role} or ''), pack => { fill => 'x' }, hint => "The role played (or job filled) in the production", );
 	my $ybox = labelBox($editbox,"Year",'ybox','v',labex => 1);
-	my $year = $ybox->insert( InputLine => text => ($$existing{year} or ''), width => 60, maxLen => 4 );
+	my $year = $ybox->insert( InputLine => text => ($$existing{year} or ''), width => 60, maxLen => 4, hint => "The year of the production", );
 	my $mbox = labelBox($editbox,"Month",'mbox','v',labex => 1);
-	my $month = $mbox->insert( InputLine => text => ($$existing{mon} or ''), width => 30, maxLen => 2 );
+	my $month = $mbox->insert( InputLine => text => ($$existing{mon} or ''), width => 30, maxLen => 2, hint => "The month of the production", );
 	my $tbox = labelBox($editbox,"Troupe",'tbox','v', boxfill => 'x', labex => 1);
 	my $troupes = FlexSQL::getTroupeList($dbh);
 	my @troupelist = values $troupes;
-	my $troupe = $tbox->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => ($$existing{troupe} or config('InDef','troupe') or $troupelist[0] or ''), height => 30 );
+	my $troupe = $tbox->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => ($$existing{troupe} or config('InDef','troupe') or $troupelist[0] or ''), height => 30, hint => "The theater group that performed the production", );
 	my $crewbox = labelBox($editbox,"Crew",'cbox','v');
-	my $cbcrew = $crewbox->insert( SpeedButton => checkable => 1, checked => (($$existing{rtype} or 1) & 2 ? 1 : 0), font => applyFont('button'), );
+	my $cbcrew = $crewbox->insert( SpeedButton => checkable => 1, checked => (($$existing{rtype} or 1) & 2 ? 1 : 0), font => applyFont('button'), hint => "Check this if it was a crew role.", );
 	$cbcrew->onClick( sub { $cbcrew->text($cbcrew->checked ? "Y" : ""); } );
-	my $submitter = $editbox->insert( Button => text => "Submit", font => applyFont('button'), );
+	my $submitter = $editbox->insert( Button => text => "Submit", font => applyFont('button'), hint => "Click to submit this information.", );
 	$submitter->onClick( sub {
 		if ($work->text eq '' or $troupe->text eq '' or $role->text eq '') { sayBox($editbox,"A required field is blank!"); return; }
 		my $sid = Common::revGet($work->text,undef,%$shows);
 		my $tid = Common::revGet($troupe->text,undef,%$troupes);
 		unless (defined $sid) {
-			print "New show: " . $work->text . " will be added to database.\n";
+			Common::errorOut('Inline',0,string => "[I] New show: " . $work->text . " will be added to database.");
 			my $st = "INSERT INTO work (sname) VALUES(?);";
 			my $res = FlexSQL::doQuery(2,$dbh,$st,$work->text);
 			$st = "SELECT wid FROM work WHERE sname=?;";
@@ -535,7 +571,7 @@ sub editRole {
 			$sid = $res unless ($DBI::err);
 		}
 		unless (defined $tid) {
-			print "New troupe: " . $troupe->text . " will be added to database.\n";
+			Common::errorOut('Inline',0,string => "[I] New troupe: " . $troupe->text . " will be added to database.");
 			my $st = "INSERT INTO troupe (tname) VALUES(?);";
 			my $res = FlexSQL::doQuery(2,$dbh,$st,$troupe->text);
 			$st = "SELECT tid FROM troupe WHERE tname=?;";
@@ -555,17 +591,31 @@ sub editRole {
 }
 print ".";
 
+
+=item showRole HANDLE CONTAINER (list of role field values)
+Builds a row displaying information about the role described in the
+list of values within CONTAINER. Database HANDLE is passed through to a
+function called by the button at the end of this row.
+Returns a filled HBox.
+=cut
 sub showRole {
 	my ($dbh,$target,$rid,$sid,$tid,$role,$y,$m,$mid,$rtype) = @_;
 	my $tname = FlexSQL::getTroupeByID($dbh,$tid);
 	my $sname = FlexSQL::getShowByID($dbh,$sid);
+	unless (defined $sname and $sname ne '') { return 1; }
 	my $row = labelBox($target,"$sname: $role ($tname, $m/$y)",'rolerow','h', boxfill => 'x', labfill => 'none');
 	$row->backColor(convertColor(config('UI','rolebg') or "#99f"));
-	my $editbut = $row->insert( Button => text => "Edit role", onClick => sub { editRole($dbh, $mid, $target,$row,{ show => $sname, troupe => $tname, role => $role, year => $y, mon => $m, rtype => $rtype, rid => $rid, },1) }, font => applyFont('button'), );
-	return 0;
+	my $editbut = $row->insert( Button => text => "Edit role", onClick => sub { editRole($dbh, $mid, $target,$row,{ show => $sname, troupe => $tname, role => $role, year => $y, mon => $m, rtype => $rtype, rid => $rid, },1) }, font => applyFont('button'), hint => "Click to edit the information about this role.", );
+	return $row;
 }
 print ".";
 
+=item storeRole
+Given a database handle and a list of values in the proper order, this
+function stores the values in the database and displays the role in a
+supplied target.
+No return value.
+=cut
 sub storeRole {
 	my ($dbh,$mid,$sid,$tid,$y,$m,$role,$crew,$target,$rid) = @_;
 	my %data = ( mid => $mid, work => $sid, troupe => $tid,
@@ -579,7 +629,7 @@ sub storeRole {
 	if ($DBI::err) {
 		sayBox($target,"An error occurred: $DBI::errstr");
 	}
-	unless ($rid) {
+	unless ($rid) { # gets the role ID. If we had it already, we skip this and just display the role.
 		@parms = ($data{mid},$data{work},$data{troupe},$data{year},$data{month},$data{role});
 		$st = "SELECT rid FROM cv WHERE mid=? AND work=? AND troupe=? AND year=? AND month=? AND role=?;";
 		$res = FlexSQL::doQuery(0,$dbh,$st,@parms);
@@ -594,24 +644,37 @@ sub storeRole {
 }
 print ".";
 
+=item aboutBox
+Displays the program's 'About' box.
+No return value.
+=cut
 sub aboutBox {
 	my $w = getGUI('mainWin');
 	sayBox($w,"Stager is a membership tracking program intended for community theatre troupes. If there's anything you'd like to see added to the program, let the developer know.");
 }
 print ".";
 
+=item devHelp PARENT UNFINISHEDTASK
+Displays a message that UNFINISHEDTASK is not done but is planned.
+TODO: Remove from release.
+No return value.
+=cut
 sub devHelp {
 	my ($target,$task) = @_;
 	sayBox($target,"$task is on the developer's TODO list.\nIf you'd like to help, check out the project's GitHub repo at http://github.com/over2sd/stager.");
 }
 print ".";
 
+=item castShow HANDLE CONTAINER SHOWID TROUPEID
+Displays the cast of a selected show within CONTAINER.
+No return value.
+=cut
 sub castShow {
 	my ($dbh,$target,$sid,$tid) = @_;
 	$target->empty(); # VBox function, clear list
+	unless (defined $sid and defined $tid) { $target->insert( Label => text => "An error occurred: Invalid role or troupe given.\nIDs could not be secured for both values.", wordWrap => 1, height => 60, pack => { fill => 'both' }, ); return; }
 	$target->insert( Label => text => "Cast/crew of a " . FlexSQL::getTroupeByID($dbh,$tid) . " production of " . FlexSQL::getShowByID($dbh,$sid) . ":" );
 	my $st = "SELECT mid,role FROM cv WHERE work=? AND troupe=? ;";
-	unless (defined $sid and defined $tid) { $target->insert( Label => text => "An error occurred: Invalid role or troupe given.\nIDs could not be secured for both values.", wordWrap => 1, height => 60, pack => { fill => 'both' }, ); return; }
 	my @parms = ($sid,$tid);
 	my $res = FlexSQL::doQuery(4,$dbh,$st,@parms);
 	foreach (@$res) {
@@ -624,6 +687,11 @@ sub castShow {
 }
 print ".";
 
+=item getMemNameByID HANDLE MEMBER
+Using the supplied database handle HANDLE, retrieves the name of member
+#MEMBER.
+Returns a SCALAR containing the member's name
+=cut
 sub getMemNameByID {
 	my ($dbh,$mid) = @_;
 	my $text;
@@ -631,11 +699,18 @@ sub getMemNameByID {
 	my $res = FlexSQL::doQuery(6,$dbh,$st,$mid);
 	return '' unless defined $res;
 	# TODO?: add a column allowing name order to be stored for i18n?
-	$text = "$$res{givname} $$res{famname}";
+	$text = (FIO::config('UI','eastname') ? "$$res{famname} $$res{givname}" : "$$res{givname} $$res{famname}");
 	return $text;
 }
 print ".";
 
+=item getOpts
+mkOptBox() uses the hash returned by this function to build its dialog
+automagically, so be very careful about editing this hash. Lines have
+this format:
+	POSITION => [TYPE,LABEL,CONFIG KEY,DEFAULT (or first choice),OTHER CHOICES],
+Returns a HASH containing the options the Options dialog can modify.
+=cut
 sub getOpts {
 	# First hash key (when sorted) MUST be a label containing a key that corresponds to the INI Section for the options that follow it!
 	# EACH Section needs a label conaining the Section name in the INI file where it resides.
@@ -667,7 +742,7 @@ sub getOpts {
 		'037' => ['n',"Scale factor of thumbnails",'thumbscale',0.25,0.1,0.95,0.05,0.25],
 		'038' => ['n',"Number of columns for face tab",'facecols',4,1,100,1,10],
 		'039' => ['c',"Names on buttons as 'first last', not 'last, first'",'commalessname'],
-#		'03a' => [],
+		'03a' => ['c',"Family name comes first",'eastname'],
 		'040' => ['x',"Tooltip background color: ",'hintback',"#CC9999"],
 		'041' => ['x',"Tooltip foreground color: ",'hintfore',"#000033"],
 
@@ -705,6 +780,9 @@ sub getOpts {
 }
 print ".";
 
+=item refreshUI GUI HANDLE
+This function refreshes the user interface. I think.
+=cut
 sub refreshUI {
 	my ($gui,$dbh) = @_;
 	$gui = getGUI() unless (defined $$gui{status});
@@ -714,12 +792,20 @@ sub refreshUI {
 }
 print ".";
 
+=item editMember
+Displays a dialog for editing a member.
+No return value.
+=cut
 sub editMember {
 	my ($gui,$dbh,$user) = @_;
 	editMemberDialog($gui,$dbh,(config('Custom','okedit') or "Save"),1,undef,%$user);
 }
 print ".";
 
+=item addMember
+Displays a dialog for adding or editing a member.
+No return value.
+=cut
 sub editMemberDialog {
 	my ($gui,$dbh,$buttontext,$isupdate,$targets,%user) = @_;
 	my %user2;
@@ -737,7 +823,7 @@ sub editMemberDialog {
 	my $vbox = $addbox->insert( VBox => name => 'details', pack => { fill => 'both', expand => 1 } );
 	$vbox->insert( Button =>
 		text => "Cancel",
-		onClick => sub { print "Cancelled"; $addbox->destroy(); return undef; },
+		onClick => sub { $addbox->destroy(); return; },
 		hint => "Cancel $buttontext.",
 		font => applyFont('button'),
 	);
@@ -797,6 +883,7 @@ sub editMemberDialog {
 	my $cbcrew = $mtbox->insert( CheckBox => text => "Crew", checked => ($memtype & 2), hint => "Check this if the member is willing to work offstage.", );
 	my $imbox = labelBox($vbox,"Headshot filename",'im','h', boxex => 1, boxfill => 'x');
 	my $img = $imbox->insert( InputLine => maxLen => 256, text => ($user{imgfn} or 'noface.png'), pack => { fill => 'x', expand => 1, }, hint => "Enter the name of the file you (will) put in the img/ directory\nshowing the member's head and shoulders.\nLeave blank if no photo is available.", );
+	$imbox->insert( Button => text => "Choose", font => applyFont('button'), onClick => sub { my $o = Prima::OpenDialog->new( filter => [['Portable Network Graphics' => '*.png'],['All' => '*'],],directory => 'img/.',); $img->text = $o->fileName if $o->execute; }, hint => "Click here to choose a file you've already put in the img/ directory.", );
 	$vbox->insert( Button =>
 		text => $buttontext,
 		hint => "Click here to submit the form.",
@@ -1020,7 +1107,8 @@ sub castByAge {
 	$g = ($g =~ m/[Mm]/ ? 'M' : 'F');
 	# including all columns for compatibility with putButtons
 	my $cmd = "SELECT givname,famname,mid,gender,memtype,imgfn FROM member WHERE memtype & 1 AND gender=? AND (dob IS NULL OR ?<dob AND dob<?) ORDER BY dob;";
-	my ($mindob,$maxdob) = Common::DoBrangefromAges($n,$x,1);
+	use DateTime;
+	my ($mindob,$maxdob) = Common::DoBrangefromAges(DateTime->now(),$n,$x,1);
 	my @parms = ($g,$maxdob,$mindob);
 #	print "Parms: " . join(',',@parms) . "\n";
 	my $res = FlexSQL::doQuery(4,$dbh,$cmd,@parms);

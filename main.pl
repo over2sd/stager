@@ -5,7 +5,7 @@ use warnings;
 use utf8;
 
 use Getopt::Long;
-my $version = "0.1.02alpha";
+my $version = "0.1.03alpha";
 my $conffilename = 'config.ini';
 my $showhelp = 0;
 $|++;
