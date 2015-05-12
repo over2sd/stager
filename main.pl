@@ -30,8 +30,7 @@ use PGUI;
 print "\n";
 Common::errorOut('inline',0,string => "[I] Starting GUI...");
 my $gui = PGUI::createMainWin($version);
-my $dbh = PGUI::loadDBwithSplashDetail($gui);
-PGUI::populateMainWin($dbh,$gui);
+PGUI::start($gui);
 
 print "GUI contains: " . join(", ",keys %$gui) . "\n";
 Prima->run();

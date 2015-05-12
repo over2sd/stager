@@ -53,7 +53,7 @@ print ".";
 sub loadConf {
 	my $configfilename = shift || "config.ini";
 	$cfg->SetFileName($configfilename);
-	print "Seeking configuration file...";
+	print "\n[I] Seeking configuration file...";
 	if ( -s $configfilename ) {
 		print "found. Loading...";
 		$cfg->ReadConfig();
