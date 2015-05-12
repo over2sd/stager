@@ -14,6 +14,7 @@ use GK qw( VBox Table );
 use FIO qw( config );
 use Options;
 
+### >> GK
 =item Pdie()
 Causes program to die by closing the main window.
 If a MESSAGE is passed to the function, it will be displayed in a
@@ -27,6 +28,7 @@ sub Pdie {
 	exit(-1);
 }
 
+### >> GK
 sub Pwait {
 	# Placeholder for if I ever figure out how to do a non-blocking sleep function in Prima
 	my $duration = shift or 1;
@@ -66,6 +68,7 @@ sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
 }
 print ".";
 
+### >> GK
 =item convertColor COLOR FORCE
 Takes a COLOR as either an integer value recognized by Prima or a hex
 string as #nnn or #nnnnnn.
@@ -114,6 +117,7 @@ sub createMainWin {
 }
 print ".";
 
+### >> GK
 =item GetGUI KEY
 Gets (or creates if not present) the GUI, or returns a distinct part of
 the GUI, such as the stausbar or the main window.
@@ -134,6 +138,7 @@ sub getGUI {
 }
 print ".";
 
+### >> GK
 =item getStatus PARENT
 Places a statusbar in PARENT window, or returns the existing statusbar.
 Returns an OBJECT REFERENCE to the statustbar.
@@ -149,6 +154,7 @@ sub getStatus {
 }
 print ".";
 
+### >> GK
 =item getTabByCode CODE
 Attempts to find the tab page labeled CODE and return its page ID.
 Returns an INTEGER, or UNDEF.
@@ -262,6 +268,7 @@ sub populateMainWin {
 }
 print ".";
 
+### >> GK
 =item sayBox PARENT TEXT
 Makes a dialog box with a message of TEXT and an owner of PARENT.
 GUI equivalent to 'print TEXT;'.
@@ -335,6 +342,7 @@ sub addMember {
 }
 print ".";
 
+### >> GK
 =item labelBox CONTAINER TEXT NAME ORIENTATION HASH
 This function builds a vertical or horizontal box (depending on the
 value of ORIENTATION; defaults to 'V' if missing or malformed) named
@@ -625,6 +633,7 @@ sub getOpts {
 }
 print ".";
 
+### >> GK
 =item refreshUI GUI HANDLE
 This function refreshes the user interface. I think.
 =cut
@@ -809,6 +818,11 @@ sub editMemberDialog {
 }
 print ".";
 
+=item guardianDialog WINDOW TEXT
+Calls a dialog box owned by WINDOW and attempts to break TEXT into
+default values for the dialog.
+Returns a HASH.
+=cut
 sub guardianDialog {
 	my ($parent,$string) = @_;
 	$string =~ m/Guardian: (.+) ([0-9]{7,10})/;
@@ -819,7 +833,15 @@ sub guardianDialog {
 }
 print ".";
 
-sub askbox { # makes a dialog asking for the answer(s) to a given list of questions, either a single scalar, or an array of key/question pairs whose answers will be stored in a hash with the given keys.
+### >> GK
+=item askbox WINDOW TITLE DEFAULTS QUESTIONS
+Makes and displays a dialog owned by WINDOW with TITLE in the titlebar,
+asking for the answer(s) to a given list of QUESTIONS, either a single
+scalar, or an array of key/question pairs whose answers will be stored
+in a hash with the given keys. DEFAULTS may be passed in using a hasref
+whose keys match the even-indexed values in the QUESTIONS array.
+=cut
+sub askbox {
 	my ($parent,$tibar,$defaults,@questions) = @_; # using an array allows single scalar question and preserved order of questions asked.
 	my $numq = int((scalar @questions / 2)+ 0.5);
 	print "Asking $numq questions...\n";
@@ -885,12 +907,17 @@ sub storeGuardian {
 }
 print ".";
 
+=item putButtons MEMBER MALETARGET FEMALETARGET CREWTARGET GUI HANDLE IMAGECONTROLMASK
+This function places buttons in different places based on the values of
+various switches.
+No return value.
+=cut
 sub putButtons {
 	my ($ar,$mtar,$ftar,$ctar,$gui,$dbh,$imagebutton) = @_;
 	my @a = @$ar;
 	my $target = (($a[3] =~ m/[Mm]/) ? $mtar : $ftar);
 	# TODO: use $a[2] (member ID) to count roles from roles table
-	my $text = (($imagebutton & 1 or config('UI','commalessname')) ? "$a[0] $a[1]" : "$a[1], $a[0]"); # concatenate famname, givname and put a label in the window.
+	my $text = (($imagebutton & 1 or config('UI','commalessname')) ? (config('UI','eastname') ? "$a[1] $a[0]" : "$a[0] $a[1]") : "$a[1], $a[0]"); # concatenate famname, givname and put a label in the window.
 	if (config('UI','splitmembers')) {
 		if ($a[4] & 2) { #crew
 			my ($thingone, $thingtwo); # complicated rigamarole to make it alternate between columns when placing crew buttons
@@ -914,6 +941,15 @@ sub putButtons {
 }
 print ".";
 
+=item putButton GUI HANDLE MEMBERID NAME TARGET IMAGECONTROLMASK IMAGEFILENAME
+Places a button leading to the roles page in the designated TARGET.
+IMAGECONTROLMASK determines placement, scaling, and orientation of
+button text with respect to image, as well as flatness of button.
+IMAGEFILENAME is (optionally) the image to be loaded.
+NAME is the text placed on the button. MEMBERID is passed through to
+showRoleEditor().
+No return value.
+=cut
 sub putButton {
 	my ($gui,$dbh,$id,$label,$target,$image,$src) = @_;
 	if ($image) {
@@ -946,6 +982,11 @@ sub putButton {
 }
 print ".";
 
+=item castByAge GUI HANDLE MINAGE MAXAGE GENDER
+Puts rows of face buttons in the Faces tab, filtered by MINAGE, MAXAGE,
+and GENDER. Then changes tab page to Faces tab.
+No return value.
+=cut
 sub castByAge {
 	my ($gui,$dbh,$n,$x,$g) = @_;
 #	print "I received $n-$x ($g)\n";
@@ -986,6 +1027,7 @@ sub castByAge {
 }
 print ".";
 
+### >> GK
 Common::registerErrors('PGUI::savePos',"[E] savePos was not passed a valid object!","[W] savePos requires an object to measure.");
 =item savePos WINDOW
 Given a WINDOW (or other oject with a size and origin), saves its
@@ -1009,12 +1051,14 @@ sub savePos {
 }
 print ".";
 
-=item applyFont STYLE WIDGET
-Attempts to get the font called STYLE from the configuration's Font
+### >> GK
+=item applyFont TYPE WIDGET
+Attempts to get the font called TYPE from the configuration's Font
 section (as a name and size) and apply it as a Prima font to the given
 Prima WIDGET.
 If no WIDGET is given, returns the font profile. This is useful in
 object creation without a reference saved.
+No return value.
 =cut
 sub applyFont {
 	my ($key,$widget) = @_;
@@ -1028,7 +1072,8 @@ Common::registerErrors('PGUI::start',"[E] Exiting (no DB).","[E] Could neither f
 =item start GUI
 Tries to load the database and fill the main window of the GUI.
 Registers errors.
-Returns INTEGER representing error code.
+Returns error codes.
+Returns 0 on success.
 =cut
 sub start {
 	my ($gui,$recursion) = @_;
@@ -1070,13 +1115,13 @@ $box->insert( Button => text => "Quit", onClick => sub { $window->close(); },);
 		$dbtype->onChange( sub { $liteopts->hide() if ($dbtype->value ne 'L') or $liteopts->show; });
 # TODO: Replace with SaveDialog to choose DB filename?
 		my $filebox = labelBox($liteopts,"Database filename:",'filebox','h');
-		my $file = $filebox->insert( InputLine => text => (config('DB','host') or "stager.db"));
-		$filebox->insert( Button => text => "Choose", onClick => sub { my $o = Prima::OpenDialog->new( filter => [['Databases' => '*.db'],['All' => '*'],],directory => '.',); $file->text = $o->fileName if $o->execute; }, hint => "Click here to choose an existing SQLite database file.", );
+		my $file = $filebox->insert( InputLine => text => (config('DB','host') or "stager.dbl"));
+		$filebox->insert( Button => text => "Choose", onClick => sub { my $o = Prima::OpenDialog->new( filter => [['Databases' => '*.db*'],['All' => '*'],],directory => '.',); $file->text = $o->fileName if $o->execute; }, hint => "Click here to choose an existing SQLite database file.", );
 		$box->insert( Button => text => "Save", onClick => sub {
 			$box->hide();
 			$text->push("Saving database type...");
 			config('DB','type',$dbtype->value);
-			config('DB','host',($dbtype->value eq 'L' ? $file->text : $host->text)); config('DB','user',$uname->text); config('DB','password',$pmand->checked);
+			config('DB','host',($dbtype->value eq 'L' ? $file->text : $host->text)); config('DB','user',$uname->text); config('DB','password',($dbtype->value eq 'L' ? 0 : $pmand->checked));
 			FIO::saveConf();
 			$box->destroy();
 			start($gui,$recursion + 1);
@@ -1084,20 +1129,18 @@ $box->insert( Button => text => "Quit", onClick => sub { $window->close(); },);
 	} else {
 		$box->insert( Label => text => "Establishing database connection. Please wait...");
 		my ($base,$uname,$host,$pw) = (config('DB','type',undef),config('DB','user',undef),config('DB','host',undef),config('DB','password',undef));
-		# ask for password, if needed.
-		unless ($pw) {
+		unless ($pw and $base eq 'M') { # if no password needed:
 			$box->destroy();
-			$text->push("Connecting to database...");
 			my ($dbh,$error) = loadDB($base,$host,'',$uname,$text);
-			unless (defined $dbh) { return $error; }
+			unless (defined $dbh) { Common::errorOut('PGUI::loadDB',$error); return $error; }
 			populateMainWin($dbh,$gui);
-		} else {
+		} else { # ask for password:
 			my $passrow = labelBox($box,"Enter password for $uname\@$host:",'pass','h');
 			my $passwd = $passrow->insert( InputLine => text => '', writeOnly => 1,);
 			$passrow->insert( Button => text => "Send", onClick => sub {
-				$text->push("Connecting to database...");
 				my ($dbh,$error) = loadDB($base,$host,$passwd->text,$uname,$text);
-				unless (defined $dbh) { return $error; }
+				$box->destroy();
+				unless (defined $dbh) { Common::errorOut('PGUI::loadDB',$error); return $error; }
 				populateMainWin($dbh,$gui);
 			}, );
 		}
@@ -1106,9 +1149,16 @@ $box->insert( Button => text => "Quit", onClick => sub { $window->close(); },);
 }
 print ".";
 
-
+Common::registerErrors('PGUI::loadDB',"[E] Exiting (no DB).","[E] Could neither find nor initialize tables.");
+=item loadDB DBTYPE HOST PASSWORD USER STATUSBAR
+Attempts to load the database.
+Registers errors.
+Returns error codes (undef,ERROR).
+Returns database HANDLE,0 on success.
+=cut
 sub loadDB {
 	my ($base,$host,$passwd,$uname,$text) = @_;
+	$text->push("Connecting to database...");
 	my ($dbh,$error,$errstr) = FlexSQL::getDB($base,$host,'stager',$passwd,$uname);
 	unless (defined $dbh) { # error handling
 		Common::errorOut('FlexSQL::getDB',$error,string => $errstr);
@@ -1117,17 +1167,17 @@ sub loadDB {
 		$text->push("Connected.");
 	}
 	if ($error =~ m/Unknown database/) { # rudimentary detection of first run
-		$text->text("Database not found. Attempting to initialize...");
+		$text->push("Database not found. Attempting to initialize...");
 		($dbh,$error) = FlexSQL::makeDB($base,$host,'stager',$passwd,$uname);
 	}
 	unless (defined $dbh) { # error handling
 		Pdie("ERROR: $error");
 		return undef,1;
 	} else {
-		$text->text("Connected.");
+		$text->push("Connected.");
 	}
 	unless (FlexSQL::table_exists($dbh,'work')) {
-		$text->text("Attempting to initialize database tables...");
+		$text->push("Attempting to initialize database tables...");
 		($dbh, $error) = FlexSQL::makeTables($dbh);
 		return (undef,2) unless (defined $dbh);
 	}

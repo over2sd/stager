@@ -22,7 +22,8 @@ sub getDB {
 	unless (defined $dbtype) { $dbtype = FIO::config('DB','type'); } # try to save
 	use DBI;
 	if ($dbtype eq "L") { # for people without access to a SQL server
-		$dbh = DBI->connect( "dbi:SQLite:$DBNAME.dbl" ) || return undef,1,$DBI::errstr;
+		my $host = shift || "$DBNAME.dbl";
+		$dbh = DBI->connect( "dbi:SQLite:$host" ) || return undef,1,$DBI::errstr;
 #		$dbh->do("SET NAMES 'utf8mb4'");
 		print "SQLite DB connected.";
 	} elsif ($dbtype eq "M") {
