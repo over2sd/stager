@@ -139,10 +139,10 @@ sub populateMainWin {
 		$$gui{prodpage} = $$gui{tabbar}->insert_to_page(3, VBox => name => "show cast list", pack => { fill => 'both', expand => 1, side => 'left', font => applyFont('body'), });
 		my $selshowrow = labelBox($$gui{prodpage},"Select show and troupe:",'selbox','h', boxfill => 'x', boxex => 0,);
 		my $shows = FlexSQL::getShowList($dbh);
-		my @showlist = values $shows;
+		my @showlist = values %{ $shows };
 		my $work = $selshowrow->insert( ComboBox => style => cs::DropDown, items => \@showlist, text => '', height => 30 );
 		my $troupes = FlexSQL::getTroupeList($dbh);
-		my @troupelist = values $troupes;
+		my @troupelist = values %{ $troupes };
 		my $troupe = $selshowrow->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => (config('InDef','troupe') or ''), height => 30 );
 		my $castlist = $$gui{prodpage}-> insert( VBox => name => 'castbox', pack => { fill => 'both', expand => 0, });
 		$selshowrow->insert( Button => text => "Show Cast/Crew", onClick => sub { my $sid = Common::revGet($work->text,undef,%$shows); my $tid = Common::revGet($troupe->text,undef,%$troupes); castShow($dbh,$castlist,$sid,$tid); }, font => applyFont('button'), );
@@ -243,7 +243,7 @@ sub editRole {
 	my $editbox = $target->insert( HBox => name => 'roleadd', pack => { fill => 'x', expand => 0, }, );
 	my $showbox = labelBox($editbox,"Production",'shobox','v',boxfill => 'x', boxex => 0, labex => 1);
 	my $shows = FlexSQL::getShowList($dbh);
-	my @showlist = values $shows;
+	my @showlist = values %{ $shows };
 	my $work = $showbox->insert( ComboBox => style => cs::DropDown, items => \@showlist, text => ($$existing{show} or ''), height => 30, hint => "The name of the production", );
 	my $rolebox = labelBox($editbox,"Role",'rolbox','v',boxfill => 'x', labex => 1);
 	my $role = $rolebox->insert( InputLine => text => ($$existing{role} or ''), pack => { fill => 'x' }, hint => "The role played (or job filled) in the production", );
@@ -253,7 +253,7 @@ sub editRole {
 	my $month = $mbox->insert( InputLine => text => ($$existing{mon} or ''), width => 30, maxLen => 2, hint => "The month of the production", );
 	my $tbox = labelBox($editbox,"Troupe",'tbox','v', boxfill => 'x', labex => 1);
 	my $troupes = FlexSQL::getTroupeList($dbh);
-	my @troupelist = values $troupes;
+	my @troupelist = values %{ $troupes };
 	my $troupe = $tbox->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => ($$existing{troupe} or config('InDef','troupe') or $troupelist[0] or ''), height => 30, hint => "The theater group that performed the production", );
 	my $crewbox = labelBox($editbox,"Crew",'cbox','v');
 	my $cbcrew = $crewbox->insert( SpeedButton => checkable => 1, checked => (($$existing{rtype} or 1) & 2 ? 1 : 0), font => applyFont('button'), hint => "Check this if it was a crew role.", );
