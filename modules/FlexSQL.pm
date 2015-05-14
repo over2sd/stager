@@ -25,7 +25,7 @@ sub getDB {
 		my $host = shift || "$DBNAME.dbl";
 		$dbh = DBI->connect( "dbi:SQLite:$host" ) || return undef,1,$DBI::errstr;
 #		$dbh->do("SET NAMES 'utf8mb4'");
-		print "SQLite DB connected.";
+#		print "SQLite DB connected.\n";
 	} elsif ($dbtype eq "M") {
 		my $host = shift || "$DBHOST";
 		my $base = shift || "$DBNAME";

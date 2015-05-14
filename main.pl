@@ -6,7 +6,7 @@ use utf8;
 
 use Getopt::Long;
 my $PROGNAME = 'Stager';
-my $version = "0.1.04alpha";
+my $version = "0.1.07alpha";
 my $conffilename = 'config.ini';
 my $showhelp = 0;
 $|++;
