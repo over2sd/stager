@@ -55,11 +55,13 @@ sub getColorsbyName {
 }
 print ".";
 
+my $bwterm = eval { require Win32; };
 sub getColors{
 	if (0) { # TODO: check for terminal color compatibility
 		return "";
 	}
 	my @colors = ("\033[0;37;40m","\033[0;31;40m","\033[0;32;40m","\033[0;33;40m","\033[0;34;40m","\033[0;35;40m","\033[0;36;40m","\033[1;31;40m","\033[1;32;40m","\033[1;33;40m","\033[1;34;40m","\033[1;35;40m","\033[1;36;40m","\033[1;37;40m","\033[0;34;47m","\033[7;37;40m","\033[1;30;40m");
+	return '' if $bwterm;
 	my $index = shift;
 	if ($index >= scalar @colors) {
 		$index = $index % scalar @colors;
@@ -80,13 +82,7 @@ sub findIn {
 		print "($v)<<";
 	}
 	unless (defined $a[$#a] and defined $v) {
-		use Carp qw( croak );
-		my @loc = caller(0);
-		my $line = $loc[2];
-		@loc = caller(1);
-		my $file = $loc[1];
-		my $func = $loc[3];
-		croak("FATAL: findIn was not sent a \$SCALAR and an \@ARRAY as required from line $line of $func in $file. Caught");
+		die "FATAL: findIn was not sent a \$SCALAR and an \@ARRAY as required" . lineNo() . "\n";
 		return -1;
 	}
 	my $i = 0;
@@ -165,7 +161,9 @@ sub getAge {
 	my $dob = shift; # expects date as "YYYY-MM-DD" or "YYYYMMDD"
 	use DateTime;
 	return undef unless (defined $dob and $dob ne '');
+	$dob =~ s/\//-/g; # prevents failure if date sent with slashes. Silly user.
 	$dob=~/([0-9]{4})-?([0-9]{2})-?([0-9]{2})/; # DATE field format from MySQL. May not work for other sources of date.
+	return undef unless (defined $1 and defined $2 and defined $3); # prevents a segfault if date sent with bad format
 	my $start = DateTime->new( year => $1, month => $2, day => $3);
 	my $end = DateTime->now;
 	my $age = $end - $start;
@@ -261,14 +259,7 @@ sub errorOut {
 	# actually registered error codes:
 	$error = $list[int($code)];
 	if ($trace) {
-		my $depth = ($args{depth} or 0);
-		use Carp qw( croak );
-		my @loc = caller($depth);
-		my $line = $loc[2];
-		my $file = $loc[1];
-		@loc = caller($depth + 1);
-		my $sub = $loc[3];
-		$error = qq{$error at line $line of $sub in $file.\n};
+		$error = $error . lineNo($args{depth} or 1);
 	}
 	$error =~ s/%d/$code/; # replace %d with $code
 	if (defined $str) {
@@ -298,6 +289,25 @@ sub errColor {
 	my ($col,$base) = (getColors($color),getColorsbyName('base'));
 	my $colstring = substr($string,0,1 + $nl) . $col . substr($string,1 + $nl,1) . $base . substr($string,2 + $nl);
 	return $colstring;
+}
+print ".";
+
+sub lineNo {
+	my $depth = shift;
+	$depth = 1 unless defined $depth;
+	use Carp qw( croak );
+	my @loc = caller($depth);
+	my $line = $loc[2];
+	my $file = $loc[1];
+	@loc = caller($depth + 1);
+	my $sub = $loc[3];
+	if ($sub ne '') {
+		@loc = split("::",$sub);
+		$sub = $loc[$#loc];
+	} else {
+		$sub = "(MAIN)";
+	}
+	return qq{ at line $line of $sub in $file.\n };
 }
 print ".";
 

@@ -997,6 +997,7 @@ sub askbox {
 		my $key = $questions[$i];
 		$ans->text($$defaults{$key}) if exists $$defaults{$key};
 		$ans->onChange( sub { $answers{$key} = $ans->text; } );
+		$answers{$key} = $ans->text; # in case the default is acceptable
 		$i += 2;
 	}
 	my $spacer = $vbox->insert( Label => text => " ", pack => { fill => 'both', expand => 1 }, );

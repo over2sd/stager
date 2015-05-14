@@ -126,8 +126,10 @@ sub makeTables { # used for first run
 	foreach my $i (0 .. $#cmds) {
 		my $st = $cmds[$i];
 		if ('SQLite' eq $dbh->{Driver}->{Name}) {
-			$st =~ s/ UNSIGNED//g; # SQLite doesn't (properly) support unsigned?
-			$st =~ s/ AUTO_INCREMENT//g; #...or auto_increment?
+			next if ($st =~ m/^USE/); # SQLite doesn't (properly) support USE? WTH
+			$st =~ s/ UNSIGNED//g; # ...or unsigned?
+			$st =~ s/INT\(\d+\) PRIMARY KEY/INTEGER PRIMARY KEY/; #...or short integer keys?
+			$st =~ s/ AUTO_INCREMENT/ AUTOINCREMENT/g; #...or auto_increment?
 		}
 		my $error = doQuery(2,$dbh,$st);
 #		print $i + 1 . ($error ? ": $st\n" : "" );
@@ -146,7 +148,7 @@ sub doQuery {
 	unless (defined $dbh) {
 		Pdie("Baka! Send me a database, if you want data.");
 	}
-	my $safeq = $dbh->prepare($statement);
+	my $safeq = $dbh->prepare($statement) or print "\nCould not prepare $statement" . Common::lineNo() . "\n";
 	if ($qtype == -1) { unless (defined $safeq) { return 0; } else { return 1; }} # prepare only
 	unless (defined $safeq) { warn "Statement could not be prepared! Aborting statement!\n"; return undef; }
 	if($qtype == 0){ # expect a scalar
@@ -194,7 +196,8 @@ print ".";
 sub table_exists {
 	my ($dbh,$table) = @_;
 	my $st = qq(SHOW TABLES LIKE ?;);
-	if ('SQLite' eq $dbh->{Driver}->{Name}) { $st = qq(SELECT tid FROM $table LIMIT 0); return doQuery(-1,$dbh,$st); }
+#	if ('SQLite' eq $dbh->{Driver}->{Name}) { $st = qq(SELECT tid FROM $table LIMIT 0); return doQuery(-1,$dbh,$st); }
+	if ('SQLite' eq $dbh->{Driver}->{Name}) { $st = qq(SELECT name FROM sqlite_master WHERE type='table' AND name=?); }
 	my $result = doQuery(0,$dbh,$st,$table);
 	return (length($result) == 0) ? 0 : 1;
 }

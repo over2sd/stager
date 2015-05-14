@@ -164,6 +164,7 @@ sub showRoleEditor {
 	$$gui{rolepage}->empty();
  	my $loading = $$gui{rolepage}->insert( Label => text => "The info for ID #$mid is now loading..." );
 	$$gui{tabbar}->pageIndex(2);
+	Common::errorOut('inline',0,string=> "showRoleEditor called without Member ID" . Common::lineNo() . "\n") unless (defined $mid);
 	my $res = FlexSQL::getMemberByID($dbh,$mid); #get info for given mid
 	my %row = %$res;
 	if (keys %row) {
@@ -263,7 +264,7 @@ sub editRole {
 		my $sid = Common::revGet($work->text,undef,%$shows);
 		my $tid = Common::revGet($troupe->text,undef,%$troupes);
 		unless (defined $sid) {
-			Common::errorOut('Inline',0,string => "[I] New show: " . $work->text . " will be added to database.");
+			Common::errorOut('inline',0,string => "[I] New show: " . $work->text . " will be added to database.");
 			my $st = "INSERT INTO work (sname) VALUES(?);";
 			my $res = FlexSQL::doQuery(2,$dbh,$st,$work->text);
 			$st = "SELECT wid FROM work WHERE sname=?;";
@@ -271,7 +272,7 @@ sub editRole {
 			$sid = $res unless ($DBI::err);
 		}
 		unless (defined $tid) {
-			Common::errorOut('Inline',0,string => "[I] New troupe: " . $troupe->text . " will be added to database.");
+			Common::errorOut('inline',0,string => "[I] New troupe: " . $troupe->text . " will be added to database.");
 			my $st = "INSERT INTO troupe (tname) VALUES(?);";
 			my $res = FlexSQL::doQuery(2,$dbh,$st,$troupe->text);
 			$st = "SELECT tid FROM troupe WHERE tname=?;";
@@ -560,6 +561,7 @@ sub editMemberDialog {
 	my $guarlabel;
 	my $guar = $abox->insert( Button => text => $guarbuttext, enabled => $guarneed, onClick => sub { %guardian = guardianDialog($$gui{mainWin},($guarlabel->text or $guartext)); $guarlabel->text("Guardian: " . ($guardian{name} or 'unknown') . " " . ($guardian{phone} or '')); $updateguar |= 2; }, hint => "If the member is a minor,\nclick this button to set information\nabout the member's guardian.", font => applyFont('button'), );
 	$dob->onChange( sub {
+		if ($dob->text =~ m/\//) { my $d = $dob->text; $d =~ s/\//-/g; $dob->text($d); return; }
 		return if (length($dob->text) < 8); # no point checking an incomplete date
 		$guarneed = ((Common::getAge($dob->text) or 0) < (config('Main','guarage') or "18"));
 		$guar->text($guarneed ? "Guardian" : "Adult");
@@ -722,6 +724,7 @@ sub putButtons {
 	my @a = @$ar;
 	my $target = (($a[3] =~ m/[Mm]/) ? $mtar : $ftar);
 	# TODO: use $a[2] (member ID) to count roles from roles table
+	$imagebutton = 0 unless defined $imagebutton;
 	my $text = (($imagebutton & 1 or config('UI','commalessname')) ? (config('UI','eastname') ? "$a[1] $a[0]" : "$a[0] $a[1]") : "$a[1], $a[0]"); # concatenate famname, givname and put a label in the window.
 	if (config('UI','splitmembers')) {
 		if ($a[4] & 2) { #crew
