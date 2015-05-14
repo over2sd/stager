@@ -7,6 +7,11 @@ print __PACKAGE__;
 
 use FIO qw( config );
 
+=item mkOptBox GUI HASH
+
+Builds and displays a dialog box of options described in provided HASH.
+
+=cut
 sub mkOptBox {
 	# need: guiset (for setting window marker, so if it exists, I can present the window instead of recreating it?)
 	my ($gui,%opts) = @_;
@@ -237,16 +242,18 @@ sub buildNumericRow {
 print ".";
 
 =item formatTooltips
+
 Formats (or reformats after options have been changed) the font,
 colors, and delay of the tooltips (hints) displayed by the program.
-Takes no arguments, as it gets its settings from config().
+Takes no arguments, as it gets its settings from L<FIO/config>().
+
 =cut
 sub formatTooltips {
 	return $::application->set(
 		hintPause => 2500,
-		hintColor => PGUI::convertColor((FIO::config('UI','hintfore') or '#000')),
-		hintBackColor => PGUI::convertColor((FIO::config('UI','hintback') or '#CFF')),
-		hintFont => PGUI::applyFont('hint'),
+		hintColor => PGK::convertColor((FIO::config('UI','hintfore') or '#000')),
+		hintBackColor => PGK::convertColor((FIO::config('UI','hintback') or '#CFF')),
+		hintFont => PGK::applyFont('hint'),
 	);
 }
 print ".";

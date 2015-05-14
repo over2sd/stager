@@ -11,10 +11,19 @@ my $cfgread = 0;
 my $emptywarned = 0;
 
 Common::registerErrors('FIO::config',"\n[W] Using empty configuration!");
+=item config SECTION KEY VALUE
+
+Given an Ini SECTION and a KEY, returns the value of that key, if it is
+in the Ini, or undef. Given a VALUE also, sets the KEY in the SECTION
+to that VALUE.
+
+=cut
 sub config {
 	my ($section,$key,$value) = @_;
 	unless (defined $value) {
-		unless ($cfgread or $emptywarned) { $emptywarned++; Common::errorOut('FIO::config',1,fatal => 0, ); }
+		unless ($cfgread or $emptywarned) {
+			$emptywarned++;
+			Common::errorOut('FIO::config',1,fatal => 0,trace => 0, depth => 1 ); }
 		if (defined $cfg->val($section,$key,undef)) {
 			return $cfg->val($section,$key);
 		} else {
@@ -53,7 +62,7 @@ print ".";
 sub loadConf {
 	my $configfilename = shift || "config.ini";
 	$cfg->SetFileName($configfilename);
-	print "\n[I] Seeking configuration file...";
+	Common::errorOut('inline',0,color => 1, fatal => 0, string => "\n[I] Seeking configuration file...");
 	if ( -s $configfilename ) {
 		print "found. Loading...";
 		$cfg->ReadConfig();

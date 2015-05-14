@@ -3,52 +3,32 @@ use strict; use warnings;
 package PGUI;
 print __PACKAGE__;
 
-my $PROGNAME = 'Stager';
+=pod
+
+=head1 PGUI
+
+Contains functions related to the Prima-based GUI elements of this
+program.
+
+=head2 Functions
+
+=cut
 
 use Prima qw(Application Buttons MsgBox FrameSet StdDlg Sliders Notebooks ScrollWidget ImageViewer);
 use Prima::Image::jpeg; # although I can't see that it's helping.
 $::wantUnicodeInput = 1;
 
-use GK qw( VBox Table );
+use PGK qw( VBox Table applyFont getGUI convertColor labelBox );
 
 use FIO qw( config );
 use Options;
 
-### >> GK
-=item Pdie()
-Causes program to die by closing the main window.
-If a MESSAGE is passed to the function, it will be displayed in a
-message box before dying.
-=cut
-sub Pdie {
-	my $message = shift;
-	my $w = getGUI('mainWin');
-	message_box("Fatal Error",$message,mb::Yes | mb::Error);
-	$w->close();
-	exit(-1);
-}
-
-### >> GK
-sub Pwait {
-	# Placeholder for if I ever figure out how to do a non-blocking sleep function in Prima
-	my $duration = shift or 1;
-	my $start = time();
-	my $end = ($start+$duration);
-	while ($end > time()) {
-#		while (events_pending()) {
-			$::application->yield();
-#		}
-		# 10ms sleep.
-		# Not much, but prevents processor spin without making waiting dialogs unresponsive.
-		select(undef,undef,undef,0.01);
-	}
-	return 0;
-}
-
 =item buildMenus
+
 This function creates the menu structure for the dropdown menubar at
 the top of the program. Pretty standard stuff.
 Returns a reference to the array describing the menus.
+
 =cut
 sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
 	my $gui = shift;
@@ -68,108 +48,12 @@ sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
 }
 print ".";
 
-### >> GK
-=item convertColor COLOR FORCE
-Takes a COLOR as either an integer value recognized by Prima or a hex
-string as #nnn or #nnnnnn.
-If FORCE is 1, the program will send the value to the converter even if
-it is only numerals (useful for sendiung 0x999  as '999' (without the #)
-This is useful for calling from an input box, which we don't expect the
-user to be putting valid Prima integers into.
-Returns an INTEGER.
-=cut
-sub convertColor {
-	my ($color,$force) = @_;
-	return undef unless (defined $color); # undef if no color given
-	return $color unless ($force or $color =~ m/^#/); # return color unchanged unless it starts with '#' (allows passing integer straight through, as saveConf is going to write it as int, but we want user to be able to write it as #ccf).
-	return ColorRow::stringToColor($color); # convert e.g. "#ccf" to integer needed by Prima
-}
-print ".";
-
-=item createMainWin VERSION WIDTH HEIGHT
-Makes the main window and passes back a hashref to the window set
-(allowing easy access to the main window, the statusbar, etc.). The
-specified VERSION (required) goes in the titlebar. If a WIDTH and
-HEIGHT are specified, the window is resized to these values. However,
-if the configuration option to save window position is enabled, these
-values will be overridden by the stored size.
-Returns a HASREF.
-=cut
-my %windowset;
-sub createMainWin {
-	my ($version,$w,$h) = @_;
-	my $window = Prima::MainWindow->new(
-		text => (config('Custom','program') or "$PROGNAME") . " v.$version",
-		size => [($w or 800),($h or 500)],
-		onClose => sub { FlexSQL::closeDB(); },
-	);
-	if (config('Main','savepos')) {
-		unless ($w and $h) { $w = config('Main','width'); $h = config('Main','height'); }
-		$window->size($w,$h);
-		$window->place( x => (config('Main','left') or 40), rely => 1, y=> -(config('Main','top') or 30), anchor => "nw");
-	}
-	$windowset{mainWin} = $window;
-	$window->set( menuItems => buildMenus(\%windowset));
-
-	#pack it all into the hash for main program use
-	$windowset{status} = getStatus($window);
-	return \%windowset;
-}
-print ".";
-
-### >> GK
-=item GetGUI KEY
-Gets (or creates if not present) the GUI, or returns a distinct part of
-the GUI, such as the stausbar or the main window.
-Returns a HASHREF, an OBJECT REFERENCE if a valid KEY was supplied, or
-UNDEF if an invalid KEY was supplied.
-=cut
-sub getGUI {
-	unless (defined keys %windowset) { createMainWin(); }
-	my $key = shift;
-	if (defined $key) {
-		if (exists $windowset{$key}) {
-			return $windowset{$key};
-		} else {
-			return undef;
-		}
-	}
-	return \%windowset;
-}
-print ".";
-
-### >> GK
-=item getStatus PARENT
-Places a statusbar in PARENT window, or returns the existing statusbar.
-Returns an OBJECT REFERENCE to the statustbar.
-=cut
-my $status = undef;
-sub getStatus {
-	my $win = shift;
-	unless(defined $status) {
-		unless (defined $win) { $win = getGUI(); }
-		$status = StatusBar->new(owner => $win)->prepare();
-	}
-	return $status;
-}
-print ".";
-
-### >> GK
-=item getTabByCode CODE
-Attempts to find the tab page labeled CODE and return its page ID.
-Returns an INTEGER, or UNDEF.
-=cut
-sub getTabByCode { # for definitively finding page ID of tabs...
-	my $code = shift;
-	my $tabs = (getGUI("tablist") or []);
-	return Common::findIn($code,@$tabs);
-}
-print ".";
-
 =item populateMainWin HANDLE GUI REFRESH
+
 Fills or refreshes the main program window, depending on the value of
 REFRESH.
 No return value.
+
 =cut
 sub populateMainWin {
 	my ($dbh,$gui,$refresh) = @_;
@@ -190,7 +74,7 @@ sub populateMainWin {
 	$$gui{tablist} = \@tabs;
 	my %args;
 	if (defined config('UI','tabson')) { $args{orientation} = (config('UI','tabson') eq "bottom" ? tno::Bottom : tno::Top); } # set tab position based on config option
-	$$gui{mainvbox} = getGUI("mainWin")->insert( VBox => name => "mainvbox", pack => { fill => "both", expand => 1, }, );
+	$$gui{mainvbox} = PGK::getGUI("mainWin")->insert( VBox => name => "mainvbox", pack => { fill => "both", expand => 1, }, );
 	$$gui{tabbar} = Prima::TabbedScrollNotebook->create(
 		style => tns::Simple,
 		tabs => \@tabtexts,
@@ -268,22 +152,12 @@ sub populateMainWin {
 }
 print ".";
 
-### >> GK
-=item sayBox PARENT TEXT
-Makes a dialog box with a message of TEXT and an owner of PARENT.
-GUI equivalent to 'print TEXT;'.
-No return value.
-=cut
-sub sayBox {
-	my ($parent,$text) = @_;
-	message($text,owner=>$parent);
-}
-print ".";
-
 =item showRoleEditor GUI HANDLE ID
+
 Puts a list of member #ID's roles in the rolepage object of GUI, pulling
 information using the given database HANDLE.
 No return value.
+
 =cut
 sub showRoleEditor {
 	my ($gui,$dbh,$mid) = @_;
@@ -333,8 +207,10 @@ sub showRoleEditor {
 print ".";
 
 =item addMember
+
 Displays a dialog for adding a member.
 No return value.
+
 =cut
 sub addMember {
 	my ($gui,$dbh,$mtarget,$ftarget,$ctarget) = @_;
@@ -342,38 +218,8 @@ sub addMember {
 }
 print ".";
 
-### >> GK
-=item labelBox CONTAINER TEXT NAME ORIENTATION HASH
-This function builds a vertical or horizontal box (depending on the
-value of ORIENTATION; defaults to 'V' if missing or malformed) named
-NAME and containing a label that says TEXT inside CONTAINER.
-
-These additional arguments may be passed in the optional HASH:
-* boxfill - How will the new box fill its parent? (pack=>fill values)
-* boxex - Will the new box expand (pack=>expand values)
-* margin - Padding around the new box
-* labfill - How will the label fill the new box? (pack=>fill values)
-* labex - Will the label expand (pack=>expand values)
-
-Returns a VBox or HBox named NAME.
-=cut
-sub labelBox {
-	my ($parent,$label,$name,$orientation,%args) = @_;
-	die "[E] Missing parameter to labelBox" unless (defined $parent and defined $label and defined $name);
-	my $box;
-	unless (defined $orientation && $orientation =~ /[Hh]/) {
-		$box = $parent->insert( VBox => name => "$name", alignment => ta::Left, );
-		$box->pack( fill => ($args{boxfill} or 'none'), expand => ($args{boxex} or 1), padx => ($args{margin} or 1), pady => ($args{margin} or 1), );
-	} else {
-		$box = $parent->insert( HBox => name => "$name", alignment => ta::Left, );
-		$box->pack( fill => ($args{boxfill} or 'none'), expand => ($args{boxex} or 1), padx => ($args{margin} or 1), pady => ($args{margin} or 1), );
-	}
-	$box->insert( Label => text => "$label", valignment => ta::Middle, alignment => ta::Left, pack => { fill => ($args{labfill} or 'x'), expand => ($args{labex} or 0), }  );
-	return $box;
-}
-print ".";
-
 =item editRole HANDLE MEMBER CONTAINER BUTTON ROLE DISPOSABLE
+
 Displays a row in CONTAINER allowing the user to edit the role
 information of member #MEMBER using database handle HANDLE to retrieve
 and update information. BUTTON is hidden during this process.
@@ -384,9 +230,10 @@ passes information about the role in a hashref ROLE and may indicate
 that BUTTON is DISPOSABLE, so editRole() will destroy it after editing.
 
 Once the user presses the Submit button, editRole() will attempt to
-store the new information using a call to storeRole(), which will also
+store the new information using a call to L</storeRole>(), which will also
 place a row with the updated information in the CONTAINER.
 No return value.
+
 =cut
 sub editRole {
 	my ($dbh, $mid, $target,$button,$existing,$killbutton) = @_;
@@ -446,10 +293,12 @@ print ".";
 
 
 =item showRole HANDLE CONTAINER (list of role field values)
+
 Builds a row displaying information about the role described in the
 list of values within CONTAINER. Database HANDLE is passed through to a
 function called by the button at the end of this row.
 Returns a filled HBox.
+
 =cut
 sub showRole {
 	my ($dbh,$target,$rid,$sid,$tid,$role,$y,$m,$mid,$rtype) = @_;
@@ -464,10 +313,12 @@ sub showRole {
 print ".";
 
 =item storeRole
+
 Given a database handle and a list of values in the proper order, this
 function stores the values in the database and displays the role in a
 supplied target.
 No return value.
+
 =cut
 sub storeRole {
 	my ($dbh,$mid,$sid,$tid,$y,$m,$role,$crew,$target,$rid) = @_;
@@ -498,19 +349,23 @@ sub storeRole {
 print ".";
 
 =item aboutBox
+
 Displays the program's 'About' box.
 No return value.
+
 =cut
 sub aboutBox {
-	my $w = getGUI('mainWin');
+	my $w = PGK::getGUI('mainWin');
 	sayBox($w,"Stager is a membership tracking program intended for community theatre troupes. If there's anything you'd like to see added to the program, let the developer know.");
 }
 print ".";
 
 =item devHelp PARENT UNFINISHEDTASK
+
 Displays a message that UNFINISHEDTASK is not done but is planned.
 TODO: Remove from release.
 No return value.
+
 =cut
 sub devHelp {
 	my ($target,$task) = @_;
@@ -519,8 +374,10 @@ sub devHelp {
 print ".";
 
 =item castShow HANDLE CONTAINER SHOWID TROUPEID
+
 Displays the cast of a selected show within CONTAINER.
 No return value.
+
 =cut
 sub castShow {
 	my ($dbh,$target,$sid,$tid) = @_;
@@ -534,16 +391,18 @@ sub castShow {
 		my $mid = $$_[0];
 		my $name = getMemNameByID($dbh,$mid);
 		my $row = labelBox($target,"$$_[1]: ",'row','h');
-		my $gui = getGUI();
+		my $gui = PGK::getGUI();
 		$row->insert( Button => text => $name, onClick => sub { showRoleEditor($gui,$dbh,$mid); }, font => applyFont('button'), );
 	}
 }
 print ".";
 
 =item getMemNameByID HANDLE MEMBER
+
 Using the supplied database handle HANDLE, retrieves the name of member
 #MEMBER.
 Returns a SCALAR containing the member's name
+
 =cut
 sub getMemNameByID {
 	my ($dbh,$mid) = @_;
@@ -558,11 +417,13 @@ sub getMemNameByID {
 print ".";
 
 =item getOpts
-mkOptBox() uses the hash returned by this function to build its dialog
+
+L<Options/mkOptBox>() uses the hash returned by this function to build its dialog
 automagically, so be very careful about editing this hash. Lines have
 this format:
 	POSITION => [TYPE,LABEL,CONFIG KEY,DEFAULT (or first choice),OTHER CHOICES],
 Returns a HASH containing the options the Options dialog can modify.
+
 =cut
 sub getOpts {
 	# First hash key (when sorted) MUST be a label containing a key that corresponds to the INI Section for the options that follow it!
@@ -633,22 +494,11 @@ sub getOpts {
 }
 print ".";
 
-### >> GK
-=item refreshUI GUI HANDLE
-This function refreshes the user interface. I think.
-=cut
-sub refreshUI {
-	my ($gui,$dbh) = @_;
-	$gui = getGUI() unless (defined $$gui{status});
-	$dbh = FlexSQL::getDB() unless (defined $dbh);
-	print "Refreshing UI...\n";
-	populateMainWin($dbh,$gui,1);
-}
-print ".";
-
 =item editMember
+
 Displays a dialog for editing a member.
 No return value.
+
 =cut
 sub editMember {
 	my ($gui,$dbh,$user) = @_;
@@ -657,8 +507,10 @@ sub editMember {
 print ".";
 
 =item addMember
+
 Displays a dialog for adding or editing a member.
 No return value.
+
 =cut
 sub editMemberDialog {
 	my ($gui,$dbh,$buttontext,$isupdate,$targets,%user) = @_;
@@ -819,9 +671,11 @@ sub editMemberDialog {
 print ".";
 
 =item guardianDialog WINDOW TEXT
+
 Calls a dialog box owned by WINDOW and attempts to break TEXT into
 default values for the dialog.
 Returns a HASH.
+
 =cut
 sub guardianDialog {
 	my ($parent,$string) = @_;
@@ -829,69 +683,18 @@ sub guardianDialog {
 	my %defaults;
 	$defaults{name} = $1 if (defined $1);
 	$defaults{phone} = $2 if (defined $2);
-	return askbox($parent,(config('Custom','guarinf') or "Guardian Info"),\%defaults,name=>"Guardian Name",phone=>"Guardian Phone #");
-}
-print ".";
-
-### >> GK
-=item askbox WINDOW TITLE DEFAULTS QUESTIONS
-Makes and displays a dialog owned by WINDOW with TITLE in the titlebar,
-asking for the answer(s) to a given list of QUESTIONS, either a single
-scalar, or an array of key/question pairs whose answers will be stored
-in a hash with the given keys. DEFAULTS may be passed in using a hasref
-whose keys match the even-indexed values in the QUESTIONS array.
-=cut
-sub askbox {
-	my ($parent,$tibar,$defaults,@questions) = @_; # using an array allows single scalar question and preserved order of questions asked.
-	my $numq = int((scalar @questions / 2)+ 0.5);
-	print "Asking $numq questions...\n";
-	my $height = ($numq * 25) + 75;
-	my $askbox = Prima::Dialog->create(
-		centered => 1,
-		borderStyle => bs::Sizeable,
-		onTop => 1,
-		width => 400,
-		height => $height,
-		owner => $parent,
-		text => $tibar,
-		valignment => ta::Middle,
-		alignment => ta::Left,
-	);
-	my $extras = {};
-	my $buttons = mb::OkCancel;
-	my %answers;
-	my $vbox = $askbox->insert( VBox => autowidth => 1, pack => { fill => 'both', expand => 0, }, );
-	if (scalar @questions % 2) { # not a valid hash; assuming a single question
-		$numq = 0;
-		@questions = (one => $questions[0]); # discard all but the first element. Add a key for use by hash unpacker
-	}
-	my $i = 0;
-	until ($i > $#questions) {
-		my $row = labelBox($vbox,$questions[$i+1],"q$i",'h',boxfill=>'both', labfill => 'none', margin => 7, );
-		my $ans = $row->insert(InputLine => text => '', );
-		my $key = $questions[$i];
-		$ans->text($$defaults{$key}) if exists $$defaults{$key};
-		$ans->onChange( sub { $answers{$key} = $ans->text; } );
-		$i += 2;
-	}
-	my $spacer = $vbox->insert( Label => text => " ", pack => { fill => 'both', expand => 1 }, );
-	my $fresh = Prima::MsgBox::insert_buttons( $askbox, $buttons, $extras); # not reinventing wheel
-	$fresh->set( font => applyFont('button'), );
-	$askbox->execute;
-	if ($numq == 0) {
-		return $answers{one};
-	} else {
-		return %answers;
-	}
+	return PGK::askbox($parent,(config('Custom','guarinf') or "Guardian Info"),\%defaults,name=>"Guardian Name",phone=>"Guardian Phone #");
 }
 print ".";
 
 Common::registerErrors('PGUI::storeGuardian','[E] Statement preparation failed.','[E] Statement execution failed.');
 =item storeGuardian GUI HANDLE UPDATE HASHREF
+
 Given a HASHREF containing information about the guardian, stores or 
 updates the guardian's information in the database.
 Registers error codes.
 Returns 0 on success.
+
 =cut
 sub storeGuardian {
 	my ($gui,$dbh,$isupdate,$g) = @_;
@@ -908,9 +711,11 @@ sub storeGuardian {
 print ".";
 
 =item putButtons MEMBER MALETARGET FEMALETARGET CREWTARGET GUI HANDLE IMAGECONTROLMASK
+
 This function places buttons in different places based on the values of
 various switches.
 No return value.
+
 =cut
 sub putButtons {
 	my ($ar,$mtar,$ftar,$ctar,$gui,$dbh,$imagebutton) = @_;
@@ -942,6 +747,7 @@ sub putButtons {
 print ".";
 
 =item putButton GUI HANDLE MEMBERID NAME TARGET IMAGECONTROLMASK IMAGEFILENAME
+
 Places a button leading to the roles page in the designated TARGET.
 IMAGECONTROLMASK determines placement, scaling, and orientation of
 button text with respect to image, as well as flatness of button.
@@ -949,6 +755,7 @@ IMAGEFILENAME is (optionally) the image to be loaded.
 NAME is the text placed on the button. MEMBERID is passed through to
 showRoleEditor().
 No return value.
+
 =cut
 sub putButton {
 	my ($gui,$dbh,$id,$label,$target,$image,$src) = @_;
@@ -983,9 +790,11 @@ sub putButton {
 print ".";
 
 =item castByAge GUI HANDLE MINAGE MAXAGE GENDER
+
 Puts rows of face buttons in the Faces tab, filtered by MINAGE, MAXAGE,
 and GENDER. Then changes tab page to Faces tab.
 No return value.
+
 =cut
 sub castByAge {
 	my ($gui,$dbh,$n,$x,$g) = @_;
@@ -1027,66 +836,29 @@ sub castByAge {
 }
 print ".";
 
-### >> GK
-Common::registerErrors('PGUI::savePos',"[E] savePos was not passed a valid object!","[W] savePos requires an object to measure.");
-=item savePos WINDOW
-Given a WINDOW (or other oject with a size and origin), saves its
-position and size in the configuration file.
-Registers error codes.
-Returns 0 on success.
-=cut
-sub savePos {
-	my $o = shift;
-	return 2 unless (defined $o);
-	my ($w,$h,$l,$t) = ($o->size,$o->origin);
-	unless (defined $w && defined $h && defined $t && defined $l) {
-		return 1;
-	}
-	config('Main','width',$w);
-	config('Main','height',$h);
-	config('Main','top',$t);
-	config('Main','left',$l);
-	FIO::saveConf();
-	return 0;
-}
-print ".";
-
-### >> GK
-=item applyFont TYPE WIDGET
-Attempts to get the font called TYPE from the configuration's Font
-section (as a name and size) and apply it as a Prima font to the given
-Prima WIDGET.
-If no WIDGET is given, returns the font profile. This is useful in
-object creation without a reference saved.
-No return value.
-=cut
-sub applyFont {
-	my ($key,$widget) = @_;
-	return undef unless (defined $key); # just silently fail if no key given.
-	unless (defined $widget) { return FontRow->stringToFont(FIO::config('Font',$key) or FIO::config('Font','body') or ""); } # return the font if no wifget given (for use in insert() profiles).
-	$widget->set( font => FontRow->stringToFont(FIO::config('Font',$key) or ""),); # apply the font; Yay!
-}
-print ".";
-
 Common::registerErrors('PGUI::start',"[E] Exiting (no DB).","[E] Could neither find nor initialize tables.");
 =item start GUI
+
 Tries to load the database and fill the main window of the GUI.
 Registers errors.
 Returns error codes.
 Returns 0 on success.
+
 =cut
 sub start {
-	my ($gui,$recursion) = @_;
+	my ($gui,$program,$recursion) = @_;
 	$recursion = 0 unless defined $recursion;
 	die "Infinite loop" if $recursion > 10;
 	my $window = $$gui{mainWin};
 	my $box = $window->insert( VBox => name => "splashbox", pack => { fill => 'both', expand => 1, padx => 5, pady => 5, side => 'left', }, );
-	my $label = $box->insert( Label => text => "Loading " . (config('Custom','program') or "$PROGNAME") . "...", pack => { fill=> "x", expand => 0, side => "left", relx => 0.5, padx => 5, pady => 5,},);
-$box->insert( Button => text => "Quit", onClick => sub { $window->close(); },);
+	my $label = $box->insert( Label => text => "Loading " . (config('Custom','program') or "$program") . "...", pack => { fill=> "x", expand => 0, side => "left", relx => 0.5, padx => 5, pady => 5,},);
 	my $text = $$gui{status};
 	$text->push("Loading database config...");
 	my $dbh;
+	$box->insert( Label => text => "Welcome to $program!", font => PGK::applyFont('welcomehead'), autoHeight => 1, );
 	unless (defined config('DB','type') and defined config('DB','host')) {
+		$$gui{menu}->hide();
+		$box->insert( Button => text => "Quit without configuring", onClick => sub { $window->close(); },);
 		$text->push("Getting settings from user...");
 		$box->insert( Label => text => "All these settings can be changed later in the Prefereces dialog.\nChoose your database type.\nIf you have a SQL server, use MySQL.\nIf you can't use MySQL, choose SQLite to use a local file as a database.", autoHeight => 1, );
 		my $dbtype = $box->insert( XButtons => name => "dbtype", pack => {fill=>'none',expand=>0});
@@ -1124,7 +896,7 @@ $box->insert( Button => text => "Quit", onClick => sub { $window->close(); },);
 			config('DB','host',($dbtype->value eq 'L' ? $file->text : $host->text)); config('DB','user',$uname->text); config('DB','password',($dbtype->value eq 'L' ? 0 : $pmand->checked));
 			FIO::saveConf();
 			$box->destroy();
-			start($gui,$recursion + 1);
+			start($gui,$program,$recursion + 1);
 		});
 	} else {
 		$box->insert( Label => text => "Establishing database connection. Please wait...");
@@ -1133,6 +905,7 @@ $box->insert( Button => text => "Quit", onClick => sub { $window->close(); },);
 			$box->destroy();
 			my ($dbh,$error) = loadDB($base,$host,'',$uname,$text);
 			unless (defined $dbh) { Common::errorOut('PGUI::loadDB',$error); return $error; }
+			$$gui{menu}->show();
 			populateMainWin($dbh,$gui);
 		} else { # ask for password:
 			my $passrow = labelBox($box,"Enter password for $uname\@$host:",'pass','h');
@@ -1141,6 +914,7 @@ $box->insert( Button => text => "Quit", onClick => sub { $window->close(); },);
 				my ($dbh,$error) = loadDB($base,$host,$passwd->text,$uname,$text);
 				$box->destroy();
 				unless (defined $dbh) { Common::errorOut('PGUI::loadDB',$error); return $error; }
+				$$gui{menu}->show();
 				populateMainWin($dbh,$gui);
 			}, );
 		}
@@ -1151,10 +925,12 @@ print ".";
 
 Common::registerErrors('PGUI::loadDB',"[E] Exiting (no DB).","[E] Could neither find nor initialize tables.");
 =item loadDB DBTYPE HOST PASSWORD USER STATUSBAR
+
 Attempts to load the database.
 Registers errors.
 Returns error codes (undef,ERROR).
 Returns database HANDLE,0 on success.
+
 =cut
 sub loadDB {
 	my ($base,$host,$passwd,$uname,$text) = @_;

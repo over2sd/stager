@@ -242,8 +242,8 @@ sub errorOut {
 		return 1;
 	}
 #		use FIO qw( config ); # TODO: Fail gracefully here (eval?)
-	my $fatal = ( $args{fatal} or FIO::config('Main','fatalerr') or 0 );
-	my $color = ( $args{color} or FIO::config('Debug','termcolors') or 1 );
+	my $fatal = (defined $args{fatal} ? $args{fatal} : (FIO::config('Main','fatalerr') or 0 ));
+	my $color = (defined $args{color} ? $args{color} : (FIO::config('Debug','termcolors') or 1));
 	my $error = qq{errorOut could not find error code $code associated with $func};
 	unless (defined $errorcodelist{$func} or $func eq 'inline') {
 		warn $error;
@@ -261,11 +261,12 @@ sub errorOut {
 	# actually registered error codes:
 	$error = $list[int($code)];
 	if ($trace) {
+		my $depth = ($args{depth} or 0);
 		use Carp qw( croak );
-		my @loc = caller(0);
+		my @loc = caller($depth);
 		my $line = $loc[2];
-		@loc = caller(1);
 		my $file = $loc[1];
+		@loc = caller($depth + 1);
 		my $sub = $loc[3];
 		$error = qq{$error at line $line of $sub in $file.\n};
 	}
@@ -277,13 +278,13 @@ sub errorOut {
 	my $nl = ($error =~ m/^\n/ ? 1 : 0); # allow string to begin with newline
 	if ($error =~ m/^\n?\[E\]/) { # error
 		$color = ($color ? 1 : 0);
-		($fatal ? die errColor($error,$color) : warn errColor($error,$color));
+		($fatal ? die errColor($error,$color,$nl) : warn errColor($error,$color,$nl));
 	} elsif ($error =~ m/^\n?\[W\]/) { # warning
 		$color = ($color ? 3 : 0);
-		($fatal ? warn errColor($error,$color) : print errColor($error,$color));
+		($fatal ? warn errColor($error,$color,$nl) : print errColor($error,$color,$nl));
 	} elsif ($error =~ m/^\n?\[I\]/) { # information
 		$color = ($color ? 2 : 0);
-		print errColor($error . "\n",$color);
+		print errColor($error . "\n",$color,$nl);
 	} else { # unformatted (malformed) error
 		print $error;
 	}
@@ -295,7 +296,7 @@ sub errColor {
 	return $string unless $color; # send back uncolored
 	# TODO: check for numeric value and use getColorsbyName if not numeric
 	my ($col,$base) = (getColors($color),getColorsbyName('base'));
-	my $colstring = substr($string,0 + $nl,1) . $col . substr($string,1 + $nl,1) . $base . substr($string,2 + $nl);
+	my $colstring = substr($string,0,1 + $nl) . $col . substr($string,1 + $nl,1) . $base . substr($string,2 + $nl);
 	return $colstring;
 }
 print ".";

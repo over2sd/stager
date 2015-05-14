@@ -5,7 +5,8 @@ use warnings;
 use utf8;
 
 use Getopt::Long;
-my $version = "0.1.03alpha";
+my $PROGNAME = 'Stager';
+my $version = "0.1.04alpha";
 my $conffilename = 'config.ini';
 my $showhelp = 0;
 $|++;
@@ -29,8 +30,8 @@ use FlexSQL;
 use PGUI;
 print "\n";
 Common::errorOut('inline',0,string => "[I] Starting GUI...");
-my $gui = PGUI::createMainWin($version);
-PGUI::start($gui);
+my $gui = PGK::createMainWin($PROGNAME,$version);
+PGUI::start($gui,$PROGNAME);
 
 print "GUI contains: " . join(", ",keys %$gui) . "\n";
 Prima->run();
