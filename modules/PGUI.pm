@@ -857,7 +857,6 @@ sub start {
 	my $dbh;
 	$box->insert( Label => text => "Welcome to $program!", font => PGK::applyFont('welcomehead'), autoHeight => 1, );
 	unless (defined config('DB','type') and defined config('DB','host')) {
-		$$gui{menu}->hide();
 		$box->insert( Button => text => "Quit without configuring", onClick => sub { $window->close(); },);
 		$text->push("Getting settings from user...");
 		$box->insert( Label => text => "All these settings can be changed later in the Prefereces dialog.\nChoose your database type.\nIf you have a SQL server, use MySQL.\nIf you can't use MySQL, choose SQLite to use a local file as a database.", autoHeight => 1, );
@@ -905,7 +904,6 @@ sub start {
 			$box->destroy();
 			my ($dbh,$error) = loadDB($base,$host,'',$uname,$text);
 			unless (defined $dbh) { Common::errorOut('PGUI::loadDB',$error); return $error; }
-			$$gui{menu}->show();
 			populateMainWin($dbh,$gui);
 		} else { # ask for password:
 			my $passrow = labelBox($box,"Enter password for $uname\@$host:",'pass','h');
@@ -914,7 +912,6 @@ sub start {
 				my ($dbh,$error) = loadDB($base,$host,$passwd->text,$uname,$text);
 				$box->destroy();
 				unless (defined $dbh) { Common::errorOut('PGUI::loadDB',$error); return $error; }
-				$$gui{menu}->show();
 				populateMainWin($dbh,$gui);
 			}, );
 		}
