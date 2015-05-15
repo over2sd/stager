@@ -195,11 +195,23 @@ print ".";
 
 sub table_exists {
 	my ($dbh,$table) = @_;
-	my $st = qq(SHOW TABLES LIKE ?;);
+	my @table_list = $dbh->tables();
+	my $pattern = '^`.+?`\.`(.+)`';
+	if ('SQLite' eq $dbh->{Driver}->{Name}) {
+		$pattern = '^"main"\."(.+)"$';
+	}
+	foreach (0..$#table_list) {
+		$table_list[$_] =~ m/$pattern/;
+		return 1 if ($1 eq $table);
+	}
+	return 0;
+#	my $st = qq(SHOW TABLES LIKE ?;);
 #	if ('SQLite' eq $dbh->{Driver}->{Name}) { $st = qq(SELECT tid FROM $table LIMIT 0); return doQuery(-1,$dbh,$st); }
-	if ('SQLite' eq $dbh->{Driver}->{Name}) { $st = qq(SELECT name FROM sqlite_master WHERE type='table' AND name=?); }
-	my $result = doQuery(0,$dbh,$st,$table);
-	return (length($result) == 0) ? 0 : 1;
+#	if ('SQLite' eq $dbh->{Driver}->{Name}) { $st = qq(SHOW TABLES); }#return doQuery(-1,$dbh,$st); }
+#	if ('SQLite' eq $dbh->{Driver}->{Name}) { $st = qq(PRAGMA table_info($table)); }
+#	my $result = doQuery(0,$dbh,$st,$table);
+#	my $result = doQuery(0,$dbh,$st);
+#	return (length($result) == 0) ? 0 : 1;
 }
 print ".";
 

@@ -18,7 +18,7 @@ use Prima qw(Application Buttons MsgBox FrameSet StdDlg Sliders Notebooks Scroll
 use Prima::Image::jpeg; # although I can't see that it's helping.
 $::wantUnicodeInput = 1;
 
-use PGK qw( VBox Table applyFont getGUI convertColor labelBox );
+use PGK qw( VBox Table applyFont getGUI convertColor labelBox sayBox );
 
 use FIO qw( config );
 use Options;
@@ -534,6 +534,7 @@ sub editMemberDialog {
 		hint => "Cancel $buttontext.",
 		font => applyFont('button'),
 	);
+	Common::defineAllValues(\%user); # Because we'll be comparing things with these keys later.
 	my $namebox = $vbox->insert( HBox => name => 'namebox', pack => { expand => 1, }, );
 	my $nbox1 = labelBox($namebox,"Given Name",'n1','v');
 	my $nbox2 = labelBox($namebox,"Family Name",'n2','v');
@@ -603,6 +604,13 @@ sub editMemberDialog {
 				sayBox($addbox,"Required fields: Family Name, Given Name");
 				$addbox->show();
 				return;
+			}
+			if ($guarneed) { # check for guardian
+				unless (defined $guardian{name} and $guardian{name} ne '' and defined $guardian{phone} and $guardian{phone} ne '') {
+					sayBox($addbox,"Required fields: Guardian Name, Guardian Phone.\nClick Guardian button or set Birthdate field.");
+					$addbox->show();
+					return;
+				}
 			}
 			$user2{famname} = $famname->text;
 			$user2{givname} = $givname->text;

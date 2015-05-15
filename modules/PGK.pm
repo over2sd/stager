@@ -4,7 +4,7 @@ print __PACKAGE__;
 
 require Exporter;
 @ISA = qw(Exporter);
-@EXPORT = qw( ColorRow FontRow VBox HBox Table applyFont getGUI convertColor labelBox );
+@EXPORT = qw( ColorRow FontRow VBox HBox Table applyFont getGUI convertColor labelBox sayBox );
 use Prima qw(Application Buttons MsgBox FrameSet);
 
 =head1 NAME
@@ -969,7 +969,7 @@ whose keys match the even-indexed values in the QUESTIONS array.
 sub askbox {
 	my ($parent,$tibar,$defaults,@questions) = @_; # using an array allows single scalar question and preserved order of questions asked.
 	my $numq = int((scalar @questions / 2)+ 0.5);
-	print "Asking $numq questions...\n";
+#	print "Asking $numq questions...\n";
 	my $height = ($numq * 25) + 75;
 	my $askbox = Prima::Dialog->create(
 		centered => 1,

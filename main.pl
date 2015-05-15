@@ -6,7 +6,7 @@ use utf8;
 
 use Getopt::Long;
 my $PROGNAME = 'Stager';
-my $version = "0.1.07alpha";
+my $version = "0.1.08alpha";
 my $conffilename = 'config.ini';
 my $showhelp = 0;
 $|++;
@@ -15,7 +15,7 @@ GetOptions(
 	'help|h' => \$showhelp,
 );
 if ($showhelp) {
-	print "Stager v$version\n";
+	print "$PROGNAME v$version\n";
 	print "usage: main.pl -c [configfile]\n";
 	print "All other options are controlled from within the GUI.\n";
 	exit(0);
