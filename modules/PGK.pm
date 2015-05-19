@@ -746,7 +746,7 @@ sub position_cell_child {
 
 sub adjust_column {
 	my ($self,$column) = @_;
-	my $w = $self->get_widest_column_width($column);
+	$self->get_widest_column_width($column);
 	foreach ($self->rows()) {
 		my $child = $$_[$column];
 		unless (defined $child) { next; }  # dont't try to adjust undef cell
@@ -1049,6 +1049,7 @@ sub createMainWin {
 		text => (FIO::config('Custom','program') or "$program") . " v.$version",
 		size => [($w or 800),($h or 500)],
 		onClose => sub { FlexSQL::closeDB(); },
+		font => applyFont('body'),
 	);
 	if (FIO::config('Main','savepos')) {
 		unless ($w and $h) { $w = FIO::config('Main','width'); $h = FIO::config('Main','height'); }

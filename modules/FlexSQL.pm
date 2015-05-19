@@ -7,9 +7,10 @@ require Exporter;
 @EXPORT = qw(getDB closeDB);
 
 use FIO qw( config );
+use Sui;
 
-my $DBNAME = 'stager';
-my $DBHOST = 'localhost';
+my $DBNAME = Sui::passData('dbname');
+my $DBHOST = Sui::passData('dbhost');
 
 # DB wrappers that call SQL(ite) functions, depending on which the user has chosen to use for a backend.
 my $dbh;
@@ -64,7 +65,7 @@ sub whoAmI {
 	if (($^O ne "darwin") && ($^O =~ m/[Ww]in/)) {
 		print "Asking for Windows login...\n";
 		my $canusewin32 = eval { require Win32; };
-		return Win32::LoginName if $canusewin32;
+		return Win32::LoginName() if $canusewin32;
 		return $ENV{USERNAME} || $ENV{LOGNAME} || $ENV{USER} || "player1";
 	};
 	return $ENV{LOGNAME} || $ENV{USER} || getpwuid($<); # try to get username by various means if not passed it.
@@ -74,15 +75,15 @@ print ".";
 # functions for creating database
 sub makeDB {
 	my ($dbtype) = shift; # same prep work as regular connection...
-	my $host = shift || 'localhost';
-	my $base = shift || 'stager';
+	my $host = shift || ($dbtype eq 'L' ? "$DBNAME.dbl" : "$DBHOST");
+	my $base = shift || "$DBNAME";
 	my $password = shift || '';
 	my $username = shift || whoAmI();
 	use DBI;
 	my $dbh;
 	print "Creating database...";
 	if ($dbtype eq "L") { # for people without access to a SQL server
-		$dbh = DBI->connect( "dbi:SQLite:stager.dbl" ) || return undef,"Cannot connect: $DBI::errstr";
+		$dbh = DBI->connect( "dbi:SQLite:$host" ) || return undef,"Cannot connect: $DBI::errstr";
 		my $newbase = $dbh->quote_identifier($base); # just in case...
 		unless ($dbh->func("createdb", $newbase, 'admin')) { return undef,$DBI::errstr; }
 	} elsif ($dbtype eq "M") {
@@ -101,7 +102,7 @@ sub makeDB {
 	print "Database created.";
 	$dbh->disconnect();
 	if ($dbtype eq "L") { # for people without access to a SQL server
-		$dbh = DBI->connect( "dbi:SQLite:stager.dbl" ) || return undef,"Cannot connect: $DBI::errstr";
+		$dbh = DBI->connect( "dbi:SQLite:$host" ) || return undef,"Cannot connect: $DBI::errstr";
 	} elsif ($dbtype eq "M") {
 		# connect to the database
 		my $flags = { mysql_enable_utf8mb4 => 1 };
@@ -120,7 +121,7 @@ print ".";
 sub makeTables { # used for first run
 	my ($dbh) = shift; # same prep work as regular connection...
 	print "Creating tables...";
-	open(TABDEF, "<stager.msq"); # open table definition file
+	open(TABDEF, "<$DBNAME.msq"); # open table definition file
 	my @cmds = <TABDEF>;
 	print "Importing " . scalar @cmds . " lines.";
 	foreach my $i (0 .. $#cmds) {
@@ -217,11 +218,7 @@ print ".";
 
 sub prepareFromHash {
 	my ($href,$table,$update,$extra) = @_;
-	my %tablekeys = (
-		member => ['famname','givname','hphone','mphone','email','gender','address','city','state','zip','notes','dob','memtype','imgfn'],
-		cv => ['mid','work','role','year','month','troupe','rtype'],
-		guardian => ['mid','name','phone','rel']
-	);
+	my %tablekeys = %{ Sui::passData('tablekeys') };
 	my ($upcolor,$incolor,$basecolor) = ("","","");
 	if ((FIO::config('Debug','termcolors') or 0)) {
 		use Common qw( getColorsbyName );
@@ -229,11 +226,12 @@ sub prepareFromHash {
 		$incolor = Common::getColorsbyName("purple");
 		$basecolor = Common::getColorsbyName("base");
 	}
-	my %ids = ( member => "mid", cv => "rid", guardian => 'mid');
+	my %ids = %{ Sui::passData('tableids') };
 	my $idcol = $ids{$table} or return 1,"ERROR","Bad table name passed to prepareFromHash";
 	my %vals = %$href;
 	my @parms;
-	my $cmd = ($table eq "member" ? "member" : $table eq "cv" ? "cv" : $table eq "guardian" ? "guardian" : "bogus");
+	my $cmd = "bogus"; # start by assuming table name is bogus vv
+	foreach (keys %ids) { $cmd = $_ if $_ eq $table; } # ^^ If this is a valid table name worthy of being passed to SQL engine, it must be in the list we use to find IDs.
 	if ($cmd eq "bogus") { return 1,"ERROR","Bogus table name passed to prepareFromHash"; }
 	my @keys = @{$tablekeys{$table}};
 	unless ($update) {
@@ -273,68 +271,6 @@ sub prepareFromHash {
 		push(@parms,$vals{$idcol});
 	}
 	return 0,$cmd,@parms; # Normal completion
-}
-print ".";
-
-sub getMembers {
-	my ($dbh,$mtype,%exargs) = @_;
-	my $st = "SELECT givname, famname, mid, gender, memtype, imgfn FROM member ORDER BY famname, givname;";
-	my $res = doQuery(4,$dbh,$st);
-	return $res;
-}
-print ".";
-
-sub getMemberByID {
-	my ($dbh,$mid,%exargs) = @_;
-	my $st = "SELECT * FROM member WHERE mid=?;";
-	my $res = doQuery(6,$dbh,$st,$mid);
-	return $res unless $DBI::err;
-	warn $DBI::errstr;
-	return {};
-}
-print ".";
-
-my %shows;
-sub getShowByID {
-	my ($dbh,$sid) = @_;
-	unless (keys %troupes and exists $shows{"$sid"}) {
-		getShowList($dbh);
-	}
-	return $shows{"$sid"};
-}
-print ".";
-
-sub getShowList {
-	my $dbh = shift;
-	my $st = "SELECT wid,sname FROM work;";
-	my $res = doQuery(3,$dbh,$st,'wid');
-	foreach (%$res) {
-		my %row = %$_;
-		$shows{$row{wid}} = $row{sname};
-	}
-	return \%shows;
-}
-print ".";
-
-my %troupes;
-sub getTroupeByID {
-	my ($dbh,$tid) = @_;
-	unless (keys %troupes and exists $troupes{"$tid"}) {
-		getTroupeList($dbh);
-	}
-	return $troupes{"$tid"};
-}
-print ".";
-
-sub getTroupeList {
-	my $dbh = shift;
-	my $st = "SELECT tid,tname FROM troupe;";
-	my $res = doQuery(3,$dbh,$st,'tid');
-	foreach (%$res) {
-		my %row = %$_;
-		$troupes{$row{tid}} = $row{tname};
-	}
-	return \%troupes;
 }
 print ".";
 

@@ -22,6 +22,7 @@ use PGK qw( VBox Table applyFont getGUI convertColor labelBox sayBox );
 
 use FIO qw( config );
 use Options;
+use Sui;
 
 =item buildMenus
 
@@ -119,7 +120,7 @@ sub populateMainWin {
 	$agebut->onClick( sub { castByAge($gui,$dbh,$minage->value,$maxage->value,$genage->value); } );
 	$genage->onChange( sub { castByAge($gui,$dbh,$minage->value,$maxage->value,$genage->value); } );
 # Pull records from DB
-	my $res = FlexSQL::getMembers($dbh,'all',());
+	my $res = Sui::getMembers($dbh,'all',());
 # foreach record:
 	unless (defined $res) {
 		Pdie("Error: Database access yielded undef!");
@@ -138,10 +139,10 @@ sub populateMainWin {
 	if (config('UI','showprodlist')) {
 		$$gui{prodpage} = $$gui{tabbar}->insert_to_page(3, VBox => name => "show cast list", pack => { fill => 'both', expand => 1, side => 'left', font => applyFont('body'), });
 		my $selshowrow = labelBox($$gui{prodpage},"Select show and troupe:",'selbox','h', boxfill => 'x', boxex => 0,);
-		my $shows = FlexSQL::getShowList($dbh);
+		my $shows = Sui::getShowList($dbh);
 		my @showlist = values %{ $shows };
 		my $work = $selshowrow->insert( ComboBox => style => cs::DropDown, items => \@showlist, text => '', height => 30 );
-		my $troupes = FlexSQL::getTroupeList($dbh);
+		my $troupes = Sui::getTroupeList($dbh);
 		my @troupelist = values %{ $troupes };
 		my $troupe = $selshowrow->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => (config('InDef','troupe') or ''), height => 30 );
 		my $castlist = $$gui{prodpage}-> insert( VBox => name => 'castbox', pack => { fill => 'both', expand => 0, });
@@ -165,7 +166,7 @@ sub showRoleEditor {
  	my $loading = $$gui{rolepage}->insert( Label => text => "The info for ID #$mid is now loading..." );
 	$$gui{tabbar}->pageIndex(2);
 	Common::errorOut('inline',0,string=> "showRoleEditor called without Member ID" . Common::lineNo() . "\n") unless (defined $mid);
-	my $res = FlexSQL::getMemberByID($dbh,$mid); #get info for given mid
+	my $res = Sui::getMemberByID($dbh,$mid); #get info for given mid
 	my %row = %$res;
 	if (keys %row) {
 		# list info
@@ -242,7 +243,7 @@ sub editRole {
 #show => $sname, troupe => $tname, role => $role, year => $y, mon => $m, rtype => $rtype,
 	my $editbox = $target->insert( HBox => name => 'roleadd', pack => { fill => 'x', expand => 0, }, );
 	my $showbox = labelBox($editbox,"Production",'shobox','v',boxfill => 'x', boxex => 0, labex => 1);
-	my $shows = FlexSQL::getShowList($dbh);
+	my $shows = Sui::getShowList($dbh);
 	my @showlist = values %{ $shows };
 	my $work = $showbox->insert( ComboBox => style => cs::DropDown, items => \@showlist, text => ($$existing{show} or ''), height => 30, hint => "The name of the production", );
 	my $rolebox = labelBox($editbox,"Role",'rolbox','v',boxfill => 'x', labex => 1);
@@ -252,7 +253,7 @@ sub editRole {
 	my $mbox = labelBox($editbox,"Month",'mbox','v',labex => 1);
 	my $month = $mbox->insert( InputLine => text => ($$existing{mon} or ''), width => 30, maxLen => 2, hint => "The month of the production", );
 	my $tbox = labelBox($editbox,"Troupe",'tbox','v', boxfill => 'x', labex => 1);
-	my $troupes = FlexSQL::getTroupeList($dbh);
+	my $troupes = Sui::getTroupeList($dbh);
 	my @troupelist = values %{ $troupes };
 	my $troupe = $tbox->insert( ComboBox => style => cs::DropDown, items => \@troupelist, text => ($$existing{troupe} or config('InDef','troupe') or $troupelist[0] or ''), height => 30, hint => "The theater group that performed the production", );
 	my $crewbox = labelBox($editbox,"Crew",'cbox','v');
@@ -303,8 +304,8 @@ Returns a filled HBox.
 =cut
 sub showRole {
 	my ($dbh,$target,$rid,$sid,$tid,$role,$y,$m,$mid,$rtype) = @_;
-	my $tname = FlexSQL::getTroupeByID($dbh,$tid);
-	my $sname = FlexSQL::getShowByID($dbh,$sid);
+	my $tname = Sui::getTroupeByID($dbh,$tid);
+	my $sname = Sui::getShowByID($dbh,$sid);
 	unless (defined $sname and $sname ne '') { return 1; }
 	my $row = labelBox($target,"$sname: $role ($tname, $m/$y)",'rolerow','h', boxfill => 'x', labfill => 'none');
 	$row->backColor(convertColor(config('UI','rolebg') or "#99f"));
@@ -384,7 +385,7 @@ sub castShow {
 	my ($dbh,$target,$sid,$tid) = @_;
 	$target->empty(); # VBox function, clear list
 	unless (defined $sid and defined $tid) { $target->insert( Label => text => "An error occurred: Invalid role or troupe given.\nIDs could not be secured for both values.", wordWrap => 1, height => 60, pack => { fill => 'both' }, ); return; }
-	$target->insert( Label => text => "Cast/crew of a " . FlexSQL::getTroupeByID($dbh,$tid) . " production of " . FlexSQL::getShowByID($dbh,$sid) . ":" );
+	$target->insert( Label => text => "Cast/crew of a " . Sui::getTroupeByID($dbh,$tid) . " production of " . Sui::getShowByID($dbh,$sid) . ":" );
 	my $st = "SELECT mid,role FROM cv WHERE work=? AND troupe=? ;";
 	my @parms = ($sid,$tid);
 	my $res = FlexSQL::doQuery(4,$dbh,$st,@parms);
