@@ -6,17 +6,21 @@ use utf8;
 
 use Getopt::Long;
 my $PROGNAME = 'Stager';
-my $version = "0.1.09alpha";
+my $version = "0.1.10alpha";
 my $conffilename = 'config.ini';
 my $showhelp = 0;
+my $debug = 0; # verblevel
+
 $|++;
 GetOptions(
 	'conf|c=s' => \$conffilename,
 	'help|h' => \$showhelp,
+	'verbose|v=i' => \$debug,
 );
 if ($showhelp) {
 	print "$PROGNAME v$version\n";
 	print "usage: main.pl -c [configfile]\n";
+	print " -v #: set information verbosity level";
 	print "All other options are controlled from within the GUI.\n";
 	exit(0);
 }
@@ -25,15 +29,15 @@ use Common;
 use FIO qw( loadConf );
 
 FIO::loadConf($conffilename);
+FIO::config('Debug','v',$debug);
 Options::formatTooltips();
 use FlexSQL;
 use PGUI;
 print "\n";
 Common::errorOut('inline',0,string => "[I] Starting GUI...");
 my $gui = PGK::createMainWin($PROGNAME,$version);
-PGUI::start($gui,$PROGNAME);
+PGK::startwithDB($gui,$PROGNAME);
 
-print "GUI contains: " . join(", ",keys %$gui) . "\n";
 Prima->run();
 
 print "\n";

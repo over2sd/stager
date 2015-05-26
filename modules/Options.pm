@@ -22,7 +22,7 @@ sub mkOptBox {
 	my $running = 1;
 	my $toSave = {};
 	$optbox = Prima::Window->create( text => (config('Custom','options') or "Preferences"), owner => $$gui{mainWin}, size => [640,480] ); # Make a window
-	my $vb = PGUI::labelBox($optbox,"Options",'optlist','v',boxfill => 'both', boxex => 1);
+	my $vb = PGK::labelBox($optbox,"Options",'optlist','v',boxfill => 'both', boxex => 1);
 	my %args;
 	my @tablist;
 	foreach my $k (sort keys %opts) {
@@ -59,7 +59,7 @@ sub mkOptBox {
 			$pos++;
 		} else {
 			warn "First option in hash was not a label! mkOptBox() needs a label for the first tab";
-			if (config('Main','fatalerr')) { PGUI::Pdie($$gui{mainWin},"mkOptBox not given label in first hash set"); }
+			if (config('Main','fatalerr')) { PGK::Pdie($$gui{mainWin},"mkOptBox not given label in first hash set"); }
 			return -1;
 		}
 	}
@@ -91,6 +91,8 @@ PGUI::devHelp($parent,"Date type options ($key)");
 			my $f = FontRow->new( owner => $parent );
 			my $e = $f->build($lab,{ font => (config($s,$key) or "") },{ text => "Select", });
 			$e->onChange( sub { optChange($e,[$change,$pos,$saveHash,$s,$key,$applyBut,(config($s,$key) or "")]); } );
+		}elsif (/g/) {
+			$parent->insert( Label => text => $lab, alignment => ta::Center, pack => { fill => 'x', expand => 0 }, font => PGK::applyFont($key));
 		}elsif (/m/) {
 PGUI::devHelp($parent,"Mask page options ($key)");
 		}elsif (/n/) {
@@ -106,7 +108,7 @@ PGUI::devHelp($parent,"Mask page options ($key)");
 			}
 			buildComboRow($parent,$saveHash,$applyBut,$lab,$s,$key,$col,$change,$pos,$_,@a);
 		}elsif (/t/) {
-			my $row = PGUI::labelBox($parent,$lab,'textrow','h');
+			my $row = PGK::labelBox($parent,$lab,'textrow','h');
 			my $e = $row->insert( InputLine => text => (config($s,$key) or "") );
 			$e->onChange( sub { optChange($e,[$change,$pos,$saveHash,$s,$key,$applyBut,(config($s,$key) or "")]); });
 		}elsif (/x/) {
@@ -144,7 +146,7 @@ sub optChange {
 			$value = $caller->get_font_name();
 		} elsif (/RadioButton/) {
 			($caller->get_active() ? $value = $rbval : return );
-		} elsif (/XButtons/) {
+		} elsif (/XButtons/ or /MaskGroup/) {
 			$value = $caller->value;
 		} elsif (/SpinEdit/ or /SpinButton/ or /AltSpinButton/) {
 			$value = $caller->value;
@@ -186,7 +188,7 @@ sub saveFromOpt {
 	$window->destroy();
 	# TODO: check here to see if something potentially crash-inducing has been changed, and shut down cleanly, instead, after informing user that a restart is required.
 	formatTooltips(); # set tooltip format, in case it was changed.
-	PGUI::refreshUI(PGUI::getGUI(),FlexSQL::getDB()); # refresh the UI
+	PGK::refreshUI(PGUI::getGUI(),FlexSQL::getDB()); # refresh the UI
 }
 print ".";
 
@@ -207,7 +209,7 @@ print ".";
 sub buildComboRow {
 	my ($box,$options,$applyBut,$lab,$s,$key,$d,$changes,$pos,$optyp,@presets) = @_;
 	if ($d =~ m/^#/) { $d = 0; } # if passed a hex code
-	my $row = PGUI::labelBox( $box,$lab,'comborow','h', boxex => 0, labex => 0) unless ($optyp eq 'r');
+	my $row = PGK::labelBox( $box,$lab,'comborow','h', boxex => 0, labex => 0) unless ($optyp eq 'r');
 	if ($optyp eq 's') {
 		$d = int($d); # cast as a number
 		my $selected = -1;
@@ -235,7 +237,7 @@ print ".";
 
 sub buildNumericRow {
 	my ($box,$options,$applyBut,$lab,$s,$key,$v,$changes,$pos,@boundaries) = @_;
-	my $row = PGUI::labelBox( $box,$lab,'numrow','h', boxex => 0, labex => 0);
+	my $row = PGK::labelBox( $box,$lab,'numrow','h', boxex => 0, labex => 0);
 	my $n = $row->insert( SpinEdit => value => $v, min => ($boundaries[0] or 0), max => ($boundaries[1] or 10), step => ($boundaries[2] or 1), pageStep => ($boundaries[3] or 5));
 	$n->onChange( sub { optChange($n,[$changes,$pos,$options,$s,$key,$applyBut,config($s,$key)]); });
 }

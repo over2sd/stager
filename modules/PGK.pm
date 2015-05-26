@@ -4,8 +4,10 @@ print __PACKAGE__;
 
 require Exporter;
 @ISA = qw(Exporter);
-@EXPORT = qw( ColorRow FontRow VBox HBox Table applyFont getGUI convertColor labelBox sayBox );
+@EXPORT = qw( ColorRow FontRow VBox HBox Table applyFont getGUI convertColor labelBox sayBox Pdie Pwait );
 use Prima qw(Application Buttons MsgBox FrameSet);
+
+use FIO qw( config );
 
 =head1 NAME
 
@@ -509,7 +511,7 @@ sub profile_default {
 		remainder_column => undef, # The column whose width is variable (-1 puts extra space BEFORE first column, effectively justifying table to right)
 		rows => [], # the rows of the table
 		totalWidth => 0, # The table's total width
-		maxWidth => 0, # the width of the table's avaiable space
+		maxWidth => 0, # the width of the table's available space
 		cellMargin => 5, # the margin around the cells
 		expand => 1, # expand to fill available width (versus setting right edge as sum of column widths)
 		requiredSize => [], # width, height required by table's children and margins
@@ -553,7 +555,7 @@ sub place_in_table {
 		push(@$r,$newrow); # push the new row into the list of rows
 		$max = $#$r; # update max, since we're about to use it
 		$row = $max; # whether we got to the desired row or not, put it in the new row
-	} elsif ($row < 0) { # otherwise, if the row is less than 0, assume the user wants us to put it in the highest row:
+	} elsif ($row < 0) { # otherwise, if the row is less than 0, the user wants us to put it in the highest row:
 		$row = ($#$r < 0 ? 0 : $#$r); # existing row is okay.
 	}
 	unless (defined $$r[$row]) { $$r[$row] = []; } # failsafe
@@ -1164,11 +1166,11 @@ sub refreshUI {
 	$gui = getGUI() unless (defined $$gui{status});
 	$dbh = FlexSQL::getDB() unless (defined $dbh);
 	print "Refreshing UI...\n";
-	populateMainWin($dbh,$gui,1);
+	PGUI::populateMainWin($dbh,$gui,1);
 }
 print ".";
 
-Common::registerErrors('PGUI::savePos',"[E] savePos was not passed a valid object!","[W] savePos requires an object to measure.");
+Common::registerErrors('PGK::savePos',"[E] savePos was not passed a valid object!","[W] savePos requires an object to measure.");
 
 =item savePos WINDOW
 
@@ -1207,6 +1209,130 @@ sub sayBox {
 }
 print ".";
 
+Common::registerErrors('PGK::start',"[E] Exiting (no DB).","[E] Could neither find nor initialize tables.");
+=item start GUI
+
+Tries to load the database and fill the main window of the GUI.
+Registers errors.
+Returns error codes.
+Returns 0 on success.
+
+=cut
+sub startwithDB {
+	my ($gui,$program,$recursion) = @_;
+	$recursion = 0 unless defined $recursion;
+	die "Infinite loop" if $recursion > 10;
+	my $window = $$gui{mainWin};
+	my $box = $window->insert( VBox => name => "splashbox", pack => { fill => 'both', expand => 1, padx => 5, pady => 5, side => 'left', }, );
+	my $label = $box->insert( Label => text => "Loading " . (config('Custom','program') or "$program") . "...", pack => { fill=> "x", expand => 0, side => "left", relx => 0.5, padx => 5, pady => 5,},);
+	my $text = $$gui{status};
+	$text->push("Loading database config...");
+	my $dbh;
+	$box->insert( Label => text => "Welcome to $program!", font => PGK::applyFont('welcomehead'), autoHeight => 1, );
+	unless (defined config('DB','type') and defined config('DB','host')) {
+		$box->insert( Button => text => "Quit without configuring", onClick => sub { $window->close(); },);
+		$text->push("Getting settings from user...");
+		$box->insert( Label => text => "All these settings can be changed later in the Prefereces dialog.\nChoose your database type.\nIf you have a SQL server, use MySQL.\nIf you can't use MySQL, choose SQLite to use a local file as a database.", autoHeight => 1, );
+		my $dbtype = $box->insert( XButtons => name => "dbtype", pack => {fill=>'none',expand=>0});
+		$dbtype->arrange('left');
+		my @presets = ((defined config('DB','type') ? (config('DB','type') eq 'L' ? 1 : 0) : 0),"M","MySQL","L","SQLite");
+		$dbtype-> build("Database type:",@presets);
+
+		my $dboptbox = $box->insert( HBox => name => 'dbopts');
+		my $mysqlopts = $dboptbox->insert( VBox => name => 'mysql', pack => {fill => 'x',expand => 0},);
+		$mysqlopts->hide() if ($dbtype->value eq 'L');
+		$dbtype->onChange( sub { $mysqlopts->hide() if ($dbtype->value eq 'L') or $mysqlopts->show; });
+		# unless type is SQLite:
+		my $hostbox = labelBox($mysqlopts,"Server address:",'servbox','H',);
+		my $host = $hostbox->insert( InputLine => text => (config('DB','host') or "127.0.0.1"));
+		my $umand = $mysqlopts->insert( CheckBox => name => "Username required", checked => (defined config('DB','uname') ? 1 : 0));
+		# ask user for SQL username, if needed by server (might not be, for localhost)
+		my $ubox = labelBox($mysqlopts,"Username",'ubox','h');
+		$ubox->hide unless $umand->checked;
+		$umand->onClick(sub { $ubox->show if $umand->checked or $ubox->hide;});
+		my $uname = $ubox->insert( InputLine => text => (config('DB','user') or ""));
+		my $pmand = $mysqlopts->insert( CheckBox => name => "Password required", checked => (config('DB','password') or 1));
+
+		# type is SQLite:
+		my $liteopts = $dboptbox->insert( VBox => name => 'sqlite', pack => {fill => 'x',expand => 0},);
+		$liteopts->hide() if ($dbtype->value ne 'L');
+		$dbtype->onChange( sub { $liteopts->hide() if ($dbtype->value ne 'L') or $liteopts->show; });
+# TODO: Replace with SaveDialog to choose DB filename?
+		my $filebox = labelBox($liteopts,"Database filename:",'filebox','h');
+		my $file = $filebox->insert( InputLine => text => (config('DB','host') or Sui::passData('dbname') . ".dbl"));
+		$filebox->insert( Button => text => "Choose", onClick => sub { my $o = Prima::OpenDialog->new( filter => [['Databases' => '*.db*'],['All' => '*'],],directory => '.',); $file->text = $o->fileName if $o->execute; }, hint => "Click here to choose an existing SQLite database file.", );
+		$box->insert( Button => text => "Save", onClick => sub {
+			$box->hide();
+			$text->push("Saving database type...");
+			config('DB','type',$dbtype->value);
+			config('DB','host',($dbtype->value eq 'L' ? $file->text : $host->text)); config('DB','user',$uname->text); config('DB','password',($dbtype->value eq 'L' ? 0 : $pmand->checked));
+			FIO::saveConf();
+			$box->destroy();
+			startwithDB($gui,$program,$recursion + 1);
+		});
+	} else {
+		$box->insert( Label => text => "Establishing database connection. Please wait...");
+		my ($base,$uname,$host,$pw) = (config('DB','type',undef),config('DB','user',undef),config('DB','host',undef),config('DB','password',undef));
+		unless ($pw and $base eq 'M') { # if no password needed:
+			my ($dbh,$error) = loadDB($base,$host,'',$uname,$text,$box->insert( Label => text => ""));
+			$box->destroy();
+			unless (defined $dbh) { Common::errorOut('PGK::loadDB',$error); return $error; }
+			PGUI::populateMainWin($dbh,$gui);
+		} else { # ask for password:
+			my $passrow = labelBox($box,"Enter password for $uname\@$host:",'pass','h');
+			my $passwd = $passrow->insert( InputLine => text => '', writeOnly => 1,);
+			$passrow->insert( Button => text => "Send", onClick => sub {
+				my ($dbh,$error) = loadDB($base,$host,$passwd->text,$uname,$text,$box->insert( Label => text => ""));
+				$box->destroy();
+				unless (defined $dbh) { Common::errorOut('PGK::loadDB',$error); return $error; }
+				PGUI::populateMainWin($dbh,$gui);
+			}, );
+		}
+	}
+	return 0;
+}
+print ".";
+
+Common::registerErrors('PGK::loadDB',"[E] Exiting (no DB).","[E] Could neither find nor initialize tables.");
+=item loadDB DBTYPE HOST PASSWORD USER STATUSBAR
+
+Attempts to load the database.
+Registers errors.
+Returns error codes (undef,ERROR).
+Returns database HANDLE,0 on success.
+
+=cut
+sub loadDB {
+	my ($base,$host,$passwd,$uname,$text,$widget) = @_;
+	$text->push("Connecting to database...");
+	my ($dbh,$error,$errstr) = FlexSQL::getDB($base,$host,Sui::passData('dbname'),$passwd,$uname);
+	unless (defined $dbh) { # error handling
+		Common::errorOut('FlexSQL::getDB',$error,string => $errstr);
+	} else {
+		Common::errorOut('FlexSQL::getDB',0);
+		$text->push("Connected.");
+	}
+	if ($error =~ m/Unknown database/) { # rudimentary detection of first run
+		$text->push("Database not found. Attempting to initialize...");
+		($dbh,$error) = FlexSQL::makeDB($base,$host,Sui::passData('dbname'),$passwd,$uname);
+	}
+	unless (defined $dbh) { # error handling
+		Pdie("ERROR: $error");
+		return undef,1;
+	} else {
+		$text->push("Connected.");
+	}
+	foreach (keys %{ Sui::passData('tablekeys') }) {
+		unless (FlexSQL::table_exists($dbh,$_)) {
+			$text->push("Attempting to initialize database tables...");
+			($dbh, $error) = FlexSQL::makeTables($dbh,$widget);
+			return (undef,2) unless (defined $dbh);
+		}
+	}
+	$text->push("Done loading database.");
+	return $dbh,0;
+}
+print ".";
 
 print " OK; ";
 1;

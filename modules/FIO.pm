@@ -54,7 +54,10 @@ sub validateConfig { # sets config values for missing required defaults
 print ".";
 
 sub saveConf {
+	my $debug = $cfg->val('Debug','v',undef); # store the value of debug verbosity level
+	$cfg->setval('Debug','v',undef); # don't output the command-line option for verbosity
 	$cfg->RewriteConfig();
+	$cfg->setval('Debug','v',$debug); # put the option back, in case program is still running
 	$cfgread = 1; # If we're writing, I'll assume we have some values to use
 }
 print ".";
@@ -77,22 +80,23 @@ sub gz_decom {
 	my $window = $$guiref{mainWin};
 	use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 	sub gzfail { 
-		PGUI::sayBox($window,$_);
+		PGUI::sayBox(@_);
 		return 0;
 		}
+#TODO: Make sure the failure return value passes through.
 	gunzip($ifn => $ofn, Autoclose => 1)
-		or gzfail($GunzipError);
+		or gzfail($window,$GunzipError);
 	return 1;
 }
 # TODO: Check this function more thoroughly to see if it does what is expected.
 print ".";
 
 sub getFileName {
-	my ($caller,$parent,$guir,$title,$action,$oktext,%filter) = @_;
+	my ($caller,$parent,$guir,$title,$action,$oktext,$filter) = @_;
 	unless (defined $parent) { $parent = $$guir{mainWin}; }
 	$$guir{status}->push("Choosing file...");
 	my $filebox = Prima::OpenDialog->new(
-		filter => %filter,
+		filter => $filter,
 		fileMustExist => 1
 	);
 	my $filename = undef;

@@ -33,6 +33,7 @@ sub getDB {
 		my $password = shift || '';
 		my $username = shift || whoAmI();
 		# connect to the database
+# print "[I] Connecting to $base\@$host as $username with " . ($password eq '' ? "no" : "a") . " password given.\n";
 		my $flags = { mysql_enable_utf8mb4 => 1 };
 		if ($password ne '') {
 			$dbh = DBI->connect("DBI:mysql:$base:$host",$username,$password,$flags) ||
@@ -119,13 +120,15 @@ sub makeDB {
 print ".";
 
 sub makeTables { # used for first run
-	my ($dbh) = shift; # same prep work as regular connection...
+	my ($dbh,$widget) = @_;
 	print "Creating tables...";
 	open(TABDEF, "<$DBNAME.msq"); # open table definition file
 	my @cmds = <TABDEF>;
-	print "Importing " . scalar @cmds . " lines.";
+	my $tot = scalar @cmds;
+	print "\n[I] Importing $tot lines.";
 	foreach my $i (0 .. $#cmds) {
 		my $st = $cmds[$i];
+#print $i + 1 . "$st\n";
 		if ('SQLite' eq $dbh->{Driver}->{Name}) {
 			next if ($st =~ m/^USE/); # SQLite doesn't (properly) support USE? WTH
 			$st =~ s/ UNSIGNED//g; # ...or unsigned?
@@ -133,7 +136,7 @@ sub makeTables { # used for first run
 			$st =~ s/ AUTO_INCREMENT/ AUTOINCREMENT/g; #...or auto_increment?
 		}
 		my $error = doQuery(2,$dbh,$st);
-#		print $i + 1 . ($error ? ": $st\n" : "" );
+		$widget->text("Making tables... table " . $i + 1 . "/$tot" . ($error ? ": $st\n" : "" )) if defined $widget;
 		print ".";
 		if($error) { return undef,$error; }
 	}
@@ -145,7 +148,7 @@ print ".";
 sub doQuery {
 	my ($qtype,$dbh,$statement,@parms) = @_;
 	my $realq;
-#	print "Received '$statement' ",join(',',@parms),"\n";
+	print "Received '$statement' ",join(',',@parms),"\n" if (FIO::config('Debug','v') > 5);
 	unless (defined $dbh) {
 		Pdie("Baka! Send me a database, if you want data.");
 	}
