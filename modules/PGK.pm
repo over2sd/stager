@@ -77,7 +77,7 @@ sub xClick {
 			$_->checked(1);
 			$self->value($_->name);
 			$self-> notify(q(Change));
-			$_->enabled(0);
+#			$_->enabled(0);
 		}
 	}
 }
@@ -104,7 +104,8 @@ user.
 sub insert {
 	my ($self,$class,@args) = @_;
 	my $child = $self->SUPER::insert($class,@args);
-	$child->pack(side => $profile{side});
+	$child->pack(side => $self{side});
+#	$self->prepArrow($child);
 	return $child;
 }
 
@@ -116,11 +117,12 @@ children to that side.
 =cut
 sub arrange {
 	my ($self,$newside) = @_;
-	$profile{side} = $newside if (defined $newside);
+	$self{side} = $newside if (defined $newside);
 	foreach ($self->get_widgets()) {
-		$_->pack(side => $profile{side});
+		$_->pack(side => $self{side});
 	}
 }
+
 
 package ColorRow; #Replaces Gtk2::ColorSelectionDialog
 

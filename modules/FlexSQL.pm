@@ -241,8 +241,10 @@ sub prepareFromHash {
 		my $valstxt = "VALUES (";
 		$cmd = "INSERT INTO $cmd (";
 		my @cols;
-#		push(@parms,$vals{$idcol});
-#		push(@cols,$idcol);
+		if ($$extra{idneeded}) { # for storing non autoincrement IDs
+			push(@parms,$vals{$idcol});
+			push(@cols,$idcol);
+		}
 		print "$incolor";
 		foreach (keys %vals) {
 			unless (Common::findIn($_,@keys) < 0) {
@@ -259,7 +261,7 @@ sub prepareFromHash {
 	} else {
 		$cmd = "UPDATE $cmd SET ";
 		print "$upcolor";
-		shift @keys if $table eq 'guardian'; # remove extraneous key for updating
+		shift @keys if $$extras{rem1stcol}; # some updates do not use the first key
 		foreach (keys %vals) {
 			unless (Common::findIn($_,@keys) < 0) {
 				$cmd = "$cmd$_=?, "; # columns
@@ -274,6 +276,31 @@ sub prepareFromHash {
 		push(@parms,$vals{$idcol});
 	}
 	return 0,$cmd,@parms; # Normal completion
+}
+print ".";
+
+sub getNewID {
+	my ($dbh,$table,$placeholder1,$placeholder2) = @_;
+	unless (defined $placeholder1 and defined $placeholder2) { return 2,"ERROR","No placeholder values given to newID!"; }
+	my %tablekeys = %{ Sui::passData('tablekeys') };
+	my %ids = %{ Sui::passData('tableids') };
+	return 1,"ERROR","Invalid and reserved table name 'undef' could not be used." if $table eq 'undef'; # Very funny, smarty pants DBA. Use a real name for your table.
+	$table = 'undef' unless defined $table;
+	$table =~ s/`//g; # in case user passed "safe" table name.
+	my $cmd = "bogus"; # start by assuming table name is bogus vv
+	foreach (keys %ids) { $cmd = $_ if $_ eq $table; } # ^^ If this is a valid table name worthy of being passed to SQL engine, it must be in the list we use to find IDs.
+	if ($cmd eq "bogus") { return 1,"ERROR","Bogus table name $table passed to getNewID"; }
+	my $idcol = $ids{$table}; # we just made sure this would work.
+	my @keys = @{$tablekeys{$table}};
+	$cmd = "INSERT INTO $table ($keys[0],$keys[1]) VALUES (?,?);";
+	my @parms = ($placeholder1,$placeholder2);
+	$error = doQuery(2,$dbh,$cmd,@parms);
+	if ($error == 1) { # successfully added 1 row
+		$cmd = "SELECT $idcol FROM $table WHERE $keys[0]=? AND $keys[1]=?";
+		return FlexSQL::doQuery(0,$dbh,$cmd,@parms);
+	} else {
+die "An unhandled error $error occurred during getNewID.\n"; # Replace with actual error handling.
+	}
 }
 print ".";
 

@@ -6,10 +6,11 @@ use utf8;
 
 use Getopt::Long;
 my $PROGNAME = 'Stager';
-my $version = "0.1.10alpha";
+my $version = "0.1.11alpha";
 my $conffilename = 'config.ini';
 my $showhelp = 0;
 my $debug = 0; # verblevel
+sub howVerbose { return $debug; }
 
 $|++;
 GetOptions(
@@ -26,7 +27,7 @@ if ($showhelp) {
 }
 use lib "./modules/";
 use Common;
-use FIO qw( loadConf );
+use FIO;
 
 FIO::loadConf($conffilename);
 FIO::config('Debug','v',$debug);

@@ -526,10 +526,9 @@ sub editMemberDialog {
 		owner => $$gui{mainWin},
 		onTop => 1,
 	);
-	$addbox->hide();
 	$::application->yield();
 	my $vbox = $addbox->insert( VBox => name => 'details', pack => { fill => 'both', expand => 1 } );
-	$vbox->insert( Button =>
+	my $cancel = $vbox->insert( Button =>
 		text => "Cancel",
 		onClick => sub { $addbox->destroy(); return; },
 		hint => "Cancel $buttontext.",
@@ -540,17 +539,24 @@ sub editMemberDialog {
 	my $nbox1 = labelBox($namebox,"Given Name",'n1','v');
 	my $nbox2 = labelBox($namebox,"Family Name",'n2','v');
 	my $givname = $nbox1->insert( InputLine => maxLen => 23, text => ($user{givname} or ''), hint => "Enter the member's first (given) name.", );
+	$cancel->onLeave( sub { $givname->focus(); });
 	my $famname = $nbox2->insert( InputLine => maxLen => 28, text => ($user{famname} or ''), hint => "Enter the member's last (family) name.", );
+#	$givname->onLeave( sub { $famname->focus(); });
+
 	my $phonbox = $vbox->insert( HBox => name => 'phones', pack => { fill => 'x', expand => 1, }, );
 	my $hpbox = labelBox($phonbox,"Home Phone",'pb1','v');
 	my $hphone = $hpbox->insert( InputLine => maxLen => 10, width => 150, text => ($user{hphone} or '##########'), hint => "Enter the member's home phone number.", );
+	$famname->onLeave( sub { $hphone->focus(); });
 	my $mpbox = labelBox($phonbox,"Mobile/Work Phone",'pb2','v');
 	my $mphone = $mpbox->insert( InputLine => maxLen => 10, width => 150, text => ($user{mphone} or '##########'), hint => "Enter the member's mobile or work phone number.", );
+#	$hphone->onLeave( sub { $mphone->focus(); });
 	$vbox->insert( Label => text => "E-mail Address" );
 	my $email = $vbox->insert( InputLine => maxLen => 254, text => ($user{email} or config('InDef','email') or 'user@example.com'), pack => { fill => 'x', }, hint => "Enter the member's electronic mail address.", );
+	$mphone->onLeave( sub { $email->focus(); });
 	my $abox = labelBox($vbox,"Birthdate",'abox','h',boxfill => 'x');
 # TODO: Add calendar button for date of birth? (if option selected?)
 	my $dob = $abox->insert( InputLine => maxLen => 10, width => 120, text => ($user{dob} or ''), hint => "Enter the member's date of birth\nas YYYY-MM-DD (hyphens optional)", );
+#	$email->onLeave( sub { $dob->focus(); });
 	my $guarneed = ((Common::getAge($dob->text) or 0) < (config('Main','guarage') or "18"));
 	my $guarbuttext = ($guarneed ? "Guardian" : "Adult");
 	if ($isupdate) { # Pull guardian information from DB if this is an update
@@ -562,6 +568,7 @@ sub editMemberDialog {
 	my $guartext = ($guarneed ? "Guardian: " . ($guardian{name} or 'unknown') . " " . ($guardian{phone} or '') : "---");
 	my $guarlabel;
 	my $guar = $abox->insert( Button => text => $guarbuttext, enabled => $guarneed, onClick => sub { %guardian = guardianDialog($$gui{mainWin},($guarlabel->text or $guartext)); $guarlabel->text("Guardian: " . ($guardian{name} or 'unknown') . " " . ($guardian{phone} or '')); $updateguar |= 2; }, hint => "If the member is a minor,\nclick this button to set information\nabout the member's guardian.", font => applyFont('button'), );
+#	$dob->onLeave( sub { $guar->focus(); });
 	$dob->onChange( sub {
 		if ($dob->text =~ m/\//) { my $d = $dob->text; $d =~ s/\//-/g; $dob->text($d); return; }
 		return if (length($dob->text) < 8); # no point checking an incomplete date
@@ -578,26 +585,45 @@ sub editMemberDialog {
 	$current = Common::findIn($current,@presets); # by finding it in the array
 	$current = ($current == -1 ? scalar @presets : $current/2); # and dividing its position by 2 (behavior is undefined if position is odd)
 	$gender-> build("",$current,@presets); # turn key:value pairs into exclusive buttons
+#	$guar->onLeave( sub { $gender->focus(); } );
 	$vbox->insert( Label => text => "Street Address" );
 	my $address = $vbox->insert( InputLine => maxLen => 253, text => ($user{address} or ''), pack => { fill => 'x', }, hint => "Enter the member's street address.", );
+	$guar->onLeave( sub { $address->focus(); });
 	my $cbox = $vbox->insert( HBox => name => 'citybox', pack => { expand => 1, }, );
 	my $cbox1 = labelBox($cbox,"City",'c1','v',boxfill => 'x', labfill => 'x');
 	my $cbox2 = labelBox($cbox,"State",'c2','v');
 	my $cbox3 = labelBox($cbox,"ZIP",'c3','v');
 	my $city = $cbox1->insert( InputLine => maxLen => 99, text => ($user{city} or config('InDef','city') or ''), pack => { fill => 'x', expand => 1}, hint => "Enter the member's city.", );
+#	$address->onLeave( sub { $city->focus(); });
 	my $state = $cbox2->insert( InputLine => maxLen => 3, text => ($user{state} or config('InDef','state') or ''), width => 45, hint => "Enter the member's state or province.", );
+#	$city->onLeave( sub { $state->focus(); });
 	my $zip = $cbox3->insert( InputLine => maxLen => 10, text => ($user{zip} or config('InDef','ZIP') or ''), hint => "Enter the member's ZIP or other postal code.", );
+#	$state->onLeave( sub { $zip->focus(); });
 	my $mtbox = labelBox($vbox,"Type:",'rb','h');
 	my $memtype = ($user{memtype} or 0);
-	my $cbcast = $mtbox->insert( CheckBox => text => "Cast", checked => ($memtype & 1), hint => "Check this if the member is willing to act on stage.", );
+	my $cbcast = $mtbox->insert( CheckBox => text => "Cast", checked => (($memtype or 1) & 1), hint => "Check this if the member is willing to act on stage.", );
 	my $cbcrew = $mtbox->insert( CheckBox => text => "Crew", checked => ($memtype & 2), hint => "Check this if the member is willing to work offstage.", );
 	my $imbox = labelBox($vbox,"Headshot filename",'im','h', boxex => 1, boxfill => 'x');
 	my $img = $imbox->insert( InputLine => maxLen => 256, text => ($user{imgfn} or 'noface.png'), pack => { fill => 'x', expand => 1, }, hint => "Enter the name of the file you (will) put in the img/ directory\nshowing the member's head and shoulders.\nLeave blank if no photo is available.", );
-	$imbox->insert( Button => text => "Choose", font => applyFont('button'), onClick => sub { my $o = Prima::OpenDialog->new( filter => [['Portable Network Graphics' => '*.png'],['All' => '*'],],directory => 'img/.',); $img->text = $o->fileName if $o->execute; }, hint => "Click here to choose a file you've already put in the img/ directory.", );
-	$vbox->insert( Button =>
+	$zip->onLeave( sub { $img->focus(); });
+	my $ch = $imbox->insert( Button =>
+		text => "Choose",
+		font => applyFont('button'),
+		onClick => sub {
+			my $o = Prima::OpenDialog->new( filter => [['Portable Network Graphics' => '*.png'],['All' => '*'],],directory => 'img/.',);
+			if ($o->execute) {
+				my $newtext = $o->fileName;
+				$newtext =~ s/[\/\\]?(.+[\/\\])+//g;
+				$img->text($newtext);
+			};
+		},
+		hint => "Click here to choose a file you've already put in the img/ directory.",
+	);
+	my $submit = $vbox->insert( Button =>
 		text => $buttontext,
 		hint => "Click here to submit the form.",
 		font => applyFont('button'),
+		tabOrder => -1,
 		onClick => sub {
 			$addbox->hide();
 			# process information
@@ -677,7 +703,8 @@ sub editMemberDialog {
 			} # end else (updating info)
 		} # end OK button subroutine
 	); # End of button bar under details
-	$addbox->show(); # reveal our handiwork!!
+	$ch->onLeave( sub { $submit->focus(); });
+	$addbox->focus();
 }
 print ".";
 
@@ -709,7 +736,7 @@ Returns 0 on success.
 =cut
 sub storeGuardian {
 	my ($gui,$dbh,$isupdate,$g) = @_;
-	my ($error,$cmd,@parms) = FlexSQL::prepareFromHash($g,'guardian',$isupdate);
+	my ($error,$cmd,@parms) = FlexSQL::prepareFromHash($g,'guardian',$isupdate,{rem1stcol => 1});
 	if ($error) {
 		sayBox($$gui{mainWin},"Preparing guardian " . ($isupdate ? "update" : "add") . " statement failed: $error - $parms[0]");
 		return 1;
