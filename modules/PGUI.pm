@@ -39,7 +39,7 @@ sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
 #			['~Synchronize', 'Ctrl-S', '^S', sub { message('synch!') }],
 			['~Preferences', sub { Options::mkOptBox($gui,getOpts()); }],
 			[],
-			['Close', 'Ctrl-W', km::Ctrl | ord('W'), sub { my $err = savePos($$gui{mainWin}) if (config('Main','savepos')); Common::errorOut('PGUI::savePos',$err) if $err; $$gui{mainWin}->close() } ],
+			['Close', 'Ctrl-W', km::Ctrl | ord('W'), sub { $$gui{mainWin}->close() } ],
 		]],
 		[ '~Help' => [
 			['~About', \&aboutBox],
@@ -149,7 +149,7 @@ sub populateMainWin {
 		$selshowrow->insert( Button => text => "Show Cast/Crew", onClick => sub { my $sid = Common::revGet($work->text,undef,%$shows); my $tid = Common::revGet($troupe->text,undef,%$troupes); castShow($dbh,$castlist,$sid,$tid); }, font => applyFont('button'), );
 	}
 	$$gui{status}->push("Ready.");
-	print "\n[I] Done.\n" if (FIO::config('Debug','v') > 8);
+	print "\n[I] Done.\n" if ((FIO::config('Debug','v') or 0) > 8);
 }
 print ".";
 

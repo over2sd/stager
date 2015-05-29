@@ -103,7 +103,7 @@ sub getFileName {
 	if ($filebox->execute()) {
 		$filename = $filebox->fileName;
 	} else {
-		$$guir{status}->push("File selection cancelled.");
+		$$guir{status}->text("$oktext cancelled.");
 	}
 	$filebox->destroy();
 	return $filename;
